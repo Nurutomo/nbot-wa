@@ -1,4 +1,4 @@
-# Dempedency directory
+# Dependency directory
 node_modules
 
 # Dot files
@@ -12,3 +12,12 @@ debug.log
 
 # Lock files
 package-lock.json
+
+# Temp files
+temp/audio/*
+temp/image/*
+temp/video/*
+temp/webp/*
+
+# Databases
+database/*
