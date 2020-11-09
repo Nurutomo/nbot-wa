@@ -1,7 +1,7 @@
 // Config
 const config = {
     botName: '🔹 𝙉 O T 🔹',
-    operator: ['6281515860089@c.us', '6289505648879@c.us'],
+    operator: [],
     downloadStatus: false, // Curi Status Orang :|
     msg: {
         notAdmin: '🔰 Maaf anda bukan admin',
@@ -39,6 +39,7 @@ const config = {
     },
     iklan: [
         'Grup: https://chat.whatsapp.com/KkZns1hc7FbErRvRMu4GBM',
+        'Github: https://github.com/Nurutomo/nbot-wa',
         'API: https://repl.it/@Nurutomo/MhankBarBar-Api',
     ],
     stickerGIF: {
@@ -555,12 +556,7 @@ ${monospace(
                         })
                     break
                 case c(/^source$/i, 'source'):
-                    // let selfSourceCode = fs.readFileSync(__filename)
-                    // client.sendText(from, monospace(selfSourceCode))
-                    await client.sendFile(from, __filename, 'handler.js')
-                    await client.sendFile(from, path.join(__dirname, 'index.js'), 'index.js')
-                    await client.sendFile(from, path.join(__dirname, 'package.json'), 'package.json')
-                    client.sendText(from, 'Install ini Sebelum Mulai:\n- Node JS\n- FFmpeg\n- Git\n\nTutorial:\nnpm i\nnpm i node-gyp\nnode .\n_Scan QR_')
+                    client.sendLinkWithAutoPreview(from, 'https://github.com/Nurutomo/nbot-wa', 'Repository:\nhttps://github.com/Nurutomo/nbot-wa')
                     break
                 case c(/^(mp3|audio)$/i, 'mp3'):
                     if ((isMedia || isQuotedVideo || isQuotedFile)) {
@@ -1057,6 +1053,7 @@ ${(config.iklan || []).map((iklan, i) => `║ ${i + 1}. ${iklan}`).join('\n') ||
 ║ Nurutomo
 ║ wa.me/6281515860089
 ║ https://github.com/Nurutomo/
+║ Repo: https://github.com/Nurutomo/nbot-wa
 ║
 ╚═════════════════════
 `.slice(1, -1)
