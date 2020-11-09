@@ -4,6 +4,8 @@
   "description": "Bot WA",
   "main": "index.js",
   "scripts": {
+    "start": "node index.js",
+    "install": "npm i && npm i node-gyp -g",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
@@ -12,6 +14,9 @@
     "template"
   ],
   "author": "Nurutomo",
+  "repository": {
+    "url": "https://github.com/Nurutomo/nbot-wa.git"
+  },
   "license": "ISC",
   "dependencies": {
     "@open-wa/wa-automate": "^3.0.14",
