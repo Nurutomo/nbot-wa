@@ -1,0 +1,14 @@
+# Dempedency directory
+node_modules
+
+# Dot files
+.node-persist
+
+# Log files
+debug.log
+
+# Session files
+*.data.json
+
+# Lock files
+package-lock.json
