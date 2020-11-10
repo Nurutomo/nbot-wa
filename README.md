@@ -9,12 +9,11 @@
 - Download **FFmpeg** [here](https://www.gyan.dev/ffmpeg/builds/)
 
 # Installation
-Type these on `cmd`
+Type these on `cmd`, optional: `npm i node-gyp`
 ```
 git clone https://github.com/Nurutomo/nbot-wa.git
 cd nbot-wa
 npm i
-npm i node-gyp -g
 ```
 # Starting
 ```

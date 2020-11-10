@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "install": "npm i && npm i node-gyp -g",
+    "preinstall": "set PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
@@ -31,6 +31,7 @@
     "node-fetch": "^2.6.1",
     "node-wav": "0.0.2",
     "pureimage": "^0.2.5",
+    "puppeteer": "^5.2.1",
     "sharp": "^0.26.2",
     "tree-node-cli": "^1.4.0",
     "web-audio-api": "^0.2.2"

@@ -14,10 +14,7 @@ debug.log
 package-lock.json
 
 # Temp files
-temp/audio/*
-temp/image/*
-temp/video/*
-temp/webp/*
+temp/*/*
 
 # Databases
 database/*
