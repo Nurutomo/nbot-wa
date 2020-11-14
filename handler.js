@@ -2,6 +2,7 @@
 const config = {
     botName: '🔹 𝙉 O T 🔹',
     operator: [],
+    prefix: new RegExp('^' + process.env.prefix) || /^[!@#$%^&.\/\\^]/,
     downloadStatus: false, // Curi Status Orang :|
     msg: {
         notAdmin: '🔰 Maaf anda bukan admin',
@@ -38,7 +39,8 @@ const config = {
         error: e => `⚠ *ERROR* ⚠\n\n${e}`,
     },
     iklan: [
-        'Grup: https://chat.whatsapp.com/KkZns1hc7FbErRvRMu4GBM',
+        'Anda butuh API? Sini aja:v https://st4rz.herokuapp.com (Iklan by https://wa.me/6285221100126)',
+        'Grup: https://chat.whatsapp.com/EN08hYxatxgJXdxo9dsART',
         'Github: https://github.com/Nurutomo/nbot-wa',
         'API: https://repl.it/@Nurutomo/MhankBarBar-Api',
     ],
@@ -66,13 +68,18 @@ const config = {
 // Built-in Modules
 const fs = require('fs')
 const path = require('path')
+const util = require('util')
 const { Writable } = require('stream')
 
 // Local Modules
 const { GroupData } = require('./src/database')
+const _event = require('./src/event')
 const group = new GroupData()
+const cmd = new _event()
+cmd.prefix = config.prefix
 
 // External Modules
+const text2image = require('text2image')
 const ffmpeg = require('fluent-ffmpeg')
 const sharp = require('sharp')
 const { decryptMedia, Client } = require('@open-wa/wa-automate')
@@ -95,6 +102,7 @@ try {
     var font = PImage.registerFont('IndieFlower.ttf', 'IndieFlower').loadSync()
 } catch (e) { }
 const { sizeFormatter } = require('human-readable')
+const { gravity } = require('sharp')
 const format = sizeFormatter({
     std: 'JEDEC', // 'SI' (default) | 'IEC' | 'JEDEC'
     decimalPlaces: 2,
@@ -156,10 +164,9 @@ module.exports = async (client = new Client(), message) => {
         let list = []
 
         // Bot Prefix
-        const prefix = /^[!@#$%^&.\/\\^]/
-        body = (type === 'chat' && prefix.test(body)) ?
+        body = (type === 'chat' && cmd.prefix.test(body)) ?
             body :
-            (((type === 'image' || type === 'video') && caption) && prefix.test(caption)) ?
+            (((type === 'image' || type === 'video') && caption) && cmd.prefix.test(caption)) ?
                 caption :
                 ''
         const isQuotedImage = quotedMsg && quotedMsg.type === 'image'
@@ -169,11 +176,7 @@ module.exports = async (client = new Client(), message) => {
         let rawText = type === 'chat' ?
             message.body :
             (type === 'image' || type === 'video') && caption ?
-                message.caption :
-                ''
-        let { usedPrefix, command, args, text, url } = parseCmd(prefix, body)
-
-        if (message.body && /video|image|chat/.test(message.type)) console.log(rawText.slice(0, 192))
+                message.caption : ''
         if (rawText.startsWith('> ')/* && sender.id == ownerNumber*/) {
             console.log(sender.id, 'is trying to use the execute command')
             let type = Function
@@ -183,322 +186,287 @@ module.exports = async (client = new Client(), message) => {
             try {
                 output = func((...args) => {
                     console.log(...args)
-                    if (args.length < 2) client.sendTextWithMentions(from, args[0])
-                    else client.sendTextWithMentions(from, JSON.stringify(args))
+                    client.reply(from, util.format(...args), id)
                 }, client, message, config, group)
-                await client.reply(from, '*Console Output*\n\n' + output, id)
+                await client.reply(from, '*Console Output*\n\n' + util.format(output), id)
             } catch (e) {
-                await client.reply(from, '*Console Error*\n\n' + e, id)
+                await client.reply(from, '*Console Error*\n\n' + util.format(e), id)
             }
         }
 
-        let tipe = bgColor(color(type.replace(/^./, (str) => str.toUpperCase()) + (from.startsWith('status') ? ' Status' : ''), 'black'), 'yellow')
-        if (!usedPrefix && !isGroupMsg && sender && sender.isMe) { return console.log('[RECV]', color(moment(t * 1000).format('DD/MM/YY HH:mm:ss'), 'yellow'), `${tipe} from`, color(pushname)), 'in', color(name || formattedTitle) }
-        else if (!usedPrefix && !isGroupMsg) { return console.log('[RECV]', color(moment(t * 1000).format('DD/MM/YY HH:mm:ss'), 'yellow'), `${tipe} from`, color(pushname)) }
-        else if (!usedPrefix && isGroupMsg) { return console.log('[RECV]', color(moment(t * 1000).format('DD/MM/YY HH:mm:ss'), 'yellow'), `${tipe} from`, color(pushname), 'in', color(name || formattedTitle)) }
-        if (usedPrefix && !isGroupMsg && sender && sender.isMe) { console.log(color('[EXEC]'), color(moment(t * 1000).format('DD/MM/YY HH:mm:ss'), 'yellow'), color(`${command} [${args.length}]`), 'from', color(pushname), 'in', color(name || formattedTitle)) }
-        else if (usedPrefix && !isGroupMsg) { console.log(color('[EXEC]'), color(moment(t * 1000).format('DD/MM/YY HH:mm:ss'), 'yellow'), color(`${command} [${args.length}]`), 'from', color(pushname)) }
-        else if (usedPrefix && isGroupMsg) { console.log(color('[EXEC]'), color(moment(t * 1000).format('DD/MM/YY HH:mm:ss'), 'yellow'), color(`${command} [${args.length}]`), 'from', color(pushname), 'in', color(name || formattedTitle)) }
+        cmd.on('help', ['menu', 'help', '?'], () => {
+            client.reply(from, showHelp(cmd.usedPrefix, pushname, cmd.args[0]), id)
+        })
 
+        cmd.on('ping', ['speed', 'ping'], () => {
+            client.sendText(from, `Pong!\nMerespon dalam ${moment() / 1000 - t} detik`)
+        })
 
-        let c = match(command, isGroupMsg, groupId, sender.id, reason => client.reply(from, reason, id))
-        try {
-            switch (true) {
-                case c(/^(menu|help|\?)$/i, '?'):
-                    client.reply(from, showHelp(usedPrefix, pushname, args[0]), id)
-                    break
-                case c(/^(speed|ping|\?)$/i, 'ping'):
-                    client.sendText(from, `Pong!\nMerespon dalam ${moment() / 1000 - t} detik`)
-                    break
-                case c(/^sti(c|)ker$/i, 'sticker'):
-                    // TODO: Sticker
-                    if (isMedia || isQuotedImage || isQuotedFile) {
-                        const encryptMedia = isQuotedImage || isQuotedFile ? quotedMsg : message
-                        const _mimetype = encryptMedia.mimetype
-                        const mediaData = await decryptMedia(encryptMedia)
-                        if (_mimetype === 'image/webp') client.sendRawWebpAsSticker(from, mediaData.toString('base64'), false)
+        cmd.on('sticker', /^sti(c|)ker$/i, async () => {
+            if (isMedia || isQuotedImage || isQuotedFile) {
+                const encryptMedia = isQuotedImage || isQuotedFile ? quotedMsg : message
+                const _mimetype = encryptMedia.mimetype
+                const mediaData = await decryptMedia(encryptMedia)
+                if (_mimetype === 'image/webp') client.sendRawWebpAsSticker(from, mediaData.toString('base64'), false)
 
-                        const stiker = await processSticker(mediaData, 'contain')
-                        await client.sendRawWebpAsSticker(from, stiker.toString('base64'), false)
-                    }
-                    break
-                case c(/^meme$/i, 'meme'):
-                    if (isMedia || isQuotedImage) {
-                        let top = ''
-                        let bottom = text
-                        if (/\|/.test(text)) {
-                            [top, bottom] = text.split('|')
-                        }
-                        const encryptMedia = isQuotedImage ? quotedMsg : message
-                        const mediaData = await decryptMedia(encryptMedia)
-                        const getUrl = await uploadImages(mediaData, false)
-                        const ImageBase64 = await customText(getUrl, top, bottom)
-                        client.sendFile(from, ImageBase64, 'image.png', '', null, true)
-                            .then((serialized) => console.log(`Sukses Mengirim File dengan id: ${serialized}`))
-                            .catch((err) => console.log(color('[ERROR]', 'red'), err))
-                    } else {
-                        await client.reply(from, config.msg.noMedia, id)
-                    }
-                    break
-                case c(/^(memesti(c|)ker|sti(c|)kermeme)$/i, 'memesticker'):
-                    if (isMedia || isQuotedImage) {
-                        let top = ''
-                        let bottom = text
-                        if (/\|/.test(text)) {
-                            [top, bottom] = text.split('|')
-                        }
-                        const encryptMedia = isQuotedImage ? quotedMsg : message
-                        const mediaData = await decryptMedia(encryptMedia)
-                        const getUrl = await uploadImages(mediaData, false)
-                        const ImageBase64 = await customText(getUrl, top, bottom)
-                        const stiker = await processSticker(ImageBase64, 'contain') //.replace(/data:.+;base64,/, '')
-                        await client.sendRawWebpAsSticker(from, Buffer.from(stiker.replace(/data:.+;base64,/, ''), 'base64'), false)
-                    } else {
-                        await client.reply(from, config.msg.noMedia, id)
-                    }
-                    break
-                case c(/sti(c|)kergif|gifsti(c|)ker|sgif/i, 'sgif'):
-                    // TODO: Sticker GIF
-                    if ((isMedia || isQuotedVideo || isQuotedFile) && args.length === 0) {
-                        const encryptMedia = isQuotedVideo || isQuotedFile ? quotedMsg : message
-                        const _mimetype = isQuotedVideo || isQuotedFile ? quotedMsg.mimetype : mimetype
-                        client.reply(from, config.msg.waitConvert(_mimetype.replace(/.+\//, ''), 'webp', 'Stiker itu pakai format *webp*'), id)
-                        if (/image/.test(_mimetype)) client.reply(from, config.msg.recommend(usedPrefix, 'stiker'), id)
-                        console.log(color('[WAPI]'), 'Downloading and decrypting media...')
-                        const mediaData = await decryptMedia(encryptMedia)
-                        if (_mimetype === 'image/webp') client.sendRawWebpAsSticker(from, mediaData.toString('base64'), true)
-                        let temp = './temp'
-                        let name = new Date() * 1
-                        let fileInputPath = path.join(temp, /(.+)\//.exec(_mimetype)[1], `${name}.${_mimetype.replace(/.+\//, '')}`)
-                        let fileOutputPath = path.join(temp, 'webp', `${name}.webp`)
-                        console.log(color('[fs'), `Writing media file into '${fileInputPath}'`)
-                        fs.writeFile(fileInputPath, mediaData, err => {
-                            if (err) return client.sendText(from, config.msg.error('Ada yang error saat menulis file\n\n' + err)) && console.log(color('[ERROR]', 'red'), err)
-                            // ffmpeg -y -t 5 -i <input_file> -vf "scale=512:512:flags=lanczos:force_original_aspect_ratio=decrease" -qscale 100 <output_file>.webp
-                            ffmpeg(fileInputPath)
-                                .inputOptions([
-                                    '-y',
-                                    '-t', config.stickerGIF.duration
-                                ])
-                                .complexFilter([
-                                    (config.stickerGIF.fps >= 1 ? 'fps=' + config.stickerGIF.fps + ',' : '') + 'scale=512:512:flags=lanczos:force_original_aspect_ratio=decrease,format=rgba,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=#00000000,setsar=1'
-                                ])
-                                .outputOptions([
-                                    '-qscale', config.stickerGIF.quality,
-                                    '-fs', config.stickerGIF.target || '1M',
-                                    '-vcodec', 'libwebp',
-                                    // '-lossless', '1',
-                                    '-preset', 'default',
-                                    '-loop', '0',
-                                    '-an',
-                                    '-vsync', '0'
-                                ])
-                                .format('webp')
-                                .on('start', function (commandLine) {
-                                    console.log(color('[FFmpeg]'), commandLine)
-                                })
-                                .on('progress', function (progress) {
-                                    console.log(color('[FFmpeg]'), progress, '')
-                                })
-                                .on('end', function () {
-                                    console.log(color('[FFmpeg]'), 'Processing finished!')
-                                    fs.readFile(fileOutputPath, { encoding: 'base64' }, async (err, base64) => {
-                                        if (err) return client.sendText(from, config.msg.error('Ada yang error saat membaca file .webp\n\n' + err)) && console.log(color('[ERROR]', 'red'), err)
-                                        try {
-                                            await client.sendRawWebpAsSticker(from, base64, true)
-                                        } catch (e) {
-                                            console.log(color('[ERROR]', 'red'), e)
-                                            client.sendText(from, config.msg.error('Ada yang error saat mengirim stiker\n\n' + e))
-                                        }
-                                        setTimeout(() => {
-                                            try {
-                                                fs.unlinkSync(fileInputPath)
-                                                fs.unlinkSync(fileOutputPath)
-                                            } catch (e) {
-                                                console.log(color('[ERROR]', 'red'), e)
-                                            }
-                                        }, 5000)
-                                    })
-                                })
-                                .save(fileOutputPath)
+                const stiker = await processSticker(mediaData, 'contain')
+                await client.sendRawWebpAsSticker(from, stiker.toString('base64'), false)
+            }
+        })
+
+        cmd.on('meme', 'meme', async () => {
+            if (isMedia || isQuotedImage) {
+                let top = ''
+                let bottom = cmd.text
+                if (/\|/.test(cmd.text)) {
+                    [top, bottom] = cmd.text.split('|')
+                }
+                const encryptMedia = isQuotedImage ? quotedMsg : message
+                const mediaData = await decryptMedia(encryptMedia)
+                const getUrl = await uploadImages(mediaData, false)
+                const ImageBase64 = await customText(getUrl, top, bottom)
+                client.sendFile(from, ImageBase64, 'image.png', '', null, true)
+                    .then((serialized) => console.log(`Sukses Mengirim File dengan id: ${serialized}`))
+            } else await client.reply(from, config.msg.noMedia, id)
+        })
+
+        cmd.on('memesticker', /^(memesti(c|)ker|sti(c|)kermeme)$/i, async () => {
+            if (isMedia || isQuotedImage) {
+                let top = ''
+                let bottom = cmd.text
+                if (/\|/.test(cmd.text)) {
+                    [top, bottom] = cmd.text.split('|')
+                }
+                const encryptMedia = isQuotedImage ? quotedMsg : message
+                const mediaData = await decryptMedia(encryptMedia)
+                const getUrl = await uploadImages(mediaData, false)
+                const ImageBase64 = await customText(getUrl, top, bottom)
+                const stiker = await processSticker(ImageBase64, 'contain') //.replace(/data:.+;base64,/, '')
+                await client.sendRawWebpAsSticker(from, Buffer.from(stiker.replace(/data:.+;base64,/, ''), 'base64'), false)
+            } else {
+                await client.reply(from, config.msg.noMedia, id)
+            }
+        })
+
+        cmd.on('sgif', /sti(c|)kergif|gifsti(c|)ker|sgif/i, async () => {
+            if ((isMedia || isQuotedVideo || isQuotedFile) && cmd.args.length === 0) {
+                const encryptMedia = isQuotedVideo || isQuotedFile ? quotedMsg : message
+                const _mimetype = isQuotedVideo || isQuotedFile ? quotedMsg.mimetype : mimetype
+                client.reply(from, config.msg.waitConvert(_mimetype.replace(/.+\//, ''), 'webp', 'Stiker itu pakai format *webp*'), id)
+                if (/image/.test(_mimetype)) client.reply(from, config.msg.recommend(cmd.usedPrefix, 'stiker'), id)
+                console.log(color('[WAPI]'), 'Downloading and decrypting media...')
+                const mediaData = await decryptMedia(encryptMedia)
+                if (_mimetype === 'image/webp') client.sendRawWebpAsSticker(from, mediaData.toString('base64'), true)
+                let temp = './temp'
+                let name = new Date() * 1
+                let fileInputPath = path.join(temp, /(.+)\//.exec(_mimetype)[1], `${name}.${_mimetype.replace(/.+\//, '')}`)
+                let fileOutputPath = path.join(temp, 'webp', `${name}.webp`)
+                console.log(color('[fs]'), `Writing media file into '${fileInputPath}'`)
+                fs.writeFile(fileInputPath, mediaData, err => {
+                    if (err) return client.sendText(from, config.msg.error('Ada yang error saat menulis file\n\n' + err)) && _err(err)
+                    // ffmpeg -y -t 5 -i <input_file> -vf "scale=512:512:flags=lanczos:force_original_aspect_ratio=decrease" -qscale 100 <output_file>.webp
+                    ffmpeg(fileInputPath)
+                        .inputOptions([
+                            '-y',
+                            '-t', config.stickerGIF.duration
+                        ])
+                        .complexFilter([
+                            (config.stickerGIF.fps >= 1 ? 'fps=' + config.stickerGIF.fps + ',' : '') + 'scale=512:512:flags=lanczos:force_original_aspect_ratio=decrease,format=rgba,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=#00000000,setsar=1'
+                        ])
+                        .outputOptions([
+                            '-qscale', config.stickerGIF.quality,
+                            '-fs', config.stickerGIF.target || '1M',
+                            '-vcodec', 'libwebp',
+                            // '-lossless', '1',
+                            '-preset', 'default',
+                            '-loop', '0',
+                            '-an',
+                            '-vsync', '0'
+                        ])
+                        .format('webp')
+                        .on('start', function (commandLine) {
+                            console.log(color('[FFmpeg]'), commandLine)
                         })
-                    }
-                    break
-                case c(/^(add|\+)$/i, 'add'):
-                    // TODO: Add Users
-                    args = args.join(' ').split(',').map(number => number.trim())
-                    failed = permission([
-                        [!isGroupMsg, config.msg.notGroup],
-                        // [!isGroupAdmins, config.msg.notAdmin],
-                        [!isBotGroupAdmins, config.msg.notBotAdmin],
-                        [args.length === 0, config.msg.noArgs],
-                        [args.includes(botNumber), config.msg.self],
-                    ])
-                    if (failed[0]) return client.reply(from, failed[1], id)
-                    await client.sendTextWithMentions(from, config.msg.add + args.map(config.msg.listUser).join('\n'))
-                    for (let i = 0; i < args.length; i++) {
-                        client.addParticipant(groupId, args[i] + '@c.us')
-                    }
-                    break
-                case c(/^(kick|\-)$/i, 'kick'):
-                    // TODO: Kick Users
-                    failed = permission([
-                        [!isGroupMsg, config.msg.notGroup],
-                        [!isGroupAdmins, config.msg.notAdmin],
-                        [!isBotGroupAdmins, config.msg.notBotAdmin],
-                        [args.length === 0, config.msg.noArgs],
-                        [args.includes(botNumber), config.msg.self],
-                    ])
-                    if (failed[0]) return client.reply(from, failed[1], id)
-                    await client.sendTextWithMentions(from, config.msg.remove + args.map(config.msg.listUser).join('\n'))
-                    for (let i = 0; i < args.length; i++) {
-                        client.removeParticipant(groupId, args[i] + '@c.us')
-                    }
-                    break
-                case c(/^(promote|\^)$/i, 'promote'):
-                    // TODO: Promote Users
-                    failed = permission([
-                        [!isGroupMsg, config.msg.notGroup],
-                        [!isGroupAdmins, config.msg.notAdmin],
-                        [!isBotGroupAdmins, config.msg.notBotAdmin],
-                    ])
-                    if (failed[0]) return client.reply(from, failed[1], id)
-                    if (args.length > 0 && args[0] == '@a') mentionedJidList = groupMembers
-                    else if (args.length > 0 && args[0] == '@r') mentionedJidList = pickRandom(groupMembers.filter(id => !groupAdmins.includes(id)))
-                    failed = permission([
-                        [mentionedJidList.length < 1, config.msg.noJid]
-                    ])
-                    if (failed[0]) return client.reply(from, failed[1], id)
-                    for (let mentionid of mentionedJidList) {
-                        if (groupAdmins.includes(mentionid)) {
-                            promises.push(_ => new Promise(r => r(false)))
-                            failedList.push(mentionid)
-                            continue
-                        }
-                        if (mentionid === botNumber) {
-                            promises.push(_ => new Promise(r => r(false)))
-                            failedList.push(mentionid)
-                            continue
-                        }
-                        promises.push(client.promoteParticipant(groupId, mentionid))
-                        // let success = await client.promoteParticipant(groupId, mentionid)
-                        // if (success) successList.push(mentionid)
-                        // else failedList.push('Maaf, Error')
-                    }
-                    list = await Promise.all(promises)
-                    for (let id in list) {
-                        if (list[id]) successList.push(mentionedJidList[id])
-                    }
-                    client.sendTextWithMentions(from, config.msg.promoteFormat(successList, failedList))
-                    break
-                case c(/^(demote|v)$/i, 'demote'):
-                    // TODO: Demote Users
-                    failed = permission([
-                        [!isGroupMsg, config.msg.notGroup],
-                        [!isGroupAdmins, config.msg.notAdmin],
-                        [!isBotGroupAdmins, config.msg.notBotAdmin],
-                    ])
-                    if (failed[0]) return client.reply(from, failed[1], id)
-                    if (args.length > 0 && args[0] == '@a') mentionedJidList = groupMembers
-                    else if (args.length > 0 && args[0] == '@r') mentionedJidList = pickRandom(groupAdmins)
-                    failed = permission([
-                        [mentionedJidList.length < 1, config.msg.noJid]
-                    ])
-                    if (failed[0]) return client.reply(from, failed[1], id)
-                    for (let mentionid of mentionedJidList) {
-                        if (groupAdmins.includes(mentionid)) {
-                            promises.push(_ => new Promise(r => r(false)))
-                            failedList.push(mentionid)
-                            continue
-                        }
-                        if (mentionid === botNumber) {
-                            promises.push(_ => new Promise(r => r(false)))
-                            failedList.push(mentionid)
-                            continue
-                        }
-                        promises.push(client.demoteParticipant(groupId, mentionid))
-                        // let success = await client.promoteParticipant(groupId, mentionid)
-                        // if (success) successList.push(mentionid)
-                        // else failedList.push('Maaf, Error')
-                    }
-                    list = await Promise.all(promises)
-                    for (let id in list) {
-                        if (list[id]) successList.push(mentionedJidList[id])
-                    }
-                    client.sendTextWithMentions(from, config.msg.demoteFormat(successList, failedList))
-                    break
-                case c(/^re(send|post)$/i, 'resend'):
-                    // TODO: Repost Media
-                    if (quotedMsgObj) {
-                        let encryptMedia
-                        let replyOnReply = await client.getMessageById(quotedMsgObj.id)
-                        let obj = replyOnReply.quotedMsgObj
-                        if (/ptt|audio|video|image|document|sticker/.test(quotedMsgObj.type)) {
-                            encryptMedia = quotedMsgObj
-                            if (encryptMedia.animated) encryptMedia.mimetype = ''
-                        } else if (obj && /ptt|audio|video|image/.test(obj.type)) {
-                            encryptMedia = obj
-                        } else return
-                        const _mimetype = encryptMedia.mimetype
-                        const mediaData = await decryptMedia(encryptMedia)
-                        await client.sendFile(from, `data:${_mimetype};base64,${mediaData.toString('base64')}`, 'file', ':)', encryptMedia.id)
-                    } else client.reply(from, config.msg.noMedia, id)
-                    break
-                case c(/^yt((dl|)mp4|v)$/i, 'ytv'):
-                    failed = permission([
-                        [!url, config.msg.notURL]
-                    ])
-                    if (failed[0]) return client.repl(from, failed[1], id)
-                    yta(url)
-                        .then(res => {
-                            if (res.filesize > config.sizeLimit * 1000) return client.sendImage(from, res.thumb, 'thumbs.jpg', config.msg.yt(res.title, res.filesizeF) + '\n\n' + config.msg.sizeExceed(res.filesizeF), id)
-                            client.sendImage(from, res.thumb, 'thumbs.jpg', config.msg.yt(res.title, res.filesizeF) + '\n' + res.dl_link, id)
-                            client.sendFileFromUrl(from, res.dl_link, `media.${res.ext}`, config.msg.yt(res.title, res.filesizeF), id)
+                        .on('progress', function (progress) {
+                            console.log(color('[FFmpeg]'), progress, '')
                         })
-                    // mhankbarbar('ytv', '?url=' + encodeURIComponent(url))
-                    //     .then(res => res.json())
-                    //     .then(res => {
-                    //         if (res.status) {
-                    //             if (parseFloat(res.filesize) * (1024 * /MB/.test(res.filesize)) > config.sizeLimit * 1024) client.reply(from, config.msg.sizeExceed(res.filesize, id))
-                    //             client.sendImage(from, res.thumb, 'thumbs.jpg', config.msg.yt(res.title, res.filesize), id)
-                    //             client.sendFileFromUrl(from, res.result, `music.${res.ext}`, config.msg.yt(res.title, res.filesize), id)
-                    //         } else {
-                    //             client.reply(from, config.msg.error(res.error), id)
-                    //             console.log(res.error)
-                    //         }
-                    //     })
-                    break
-                case c(/^yt((dl|)mp3|a)$/i, 'yta'):
-                    failed = permission([
-                        [!url, config.msg.notURL]
-                    ])
-                    if (failed[0]) return client.reply(from, failed[1], id)
-                    yta(url)
-                        .then(res => {
-                            client.sendImage(from, res.thumb, 'thumbs.jpg', config.msg.yt(res.title, res.filesizeF) + '\n' + res.dl_link, id)
-                            client.sendFileFromUrl(from, res.dl_link, `media.${res.ext}`, config.msg.yt(res.title, res.filesizeF), id)
+                        .on('end', function () {
+                            console.log(color('[FFmpeg]'), 'Processing finished!')
+                            fs.readFile(fileOutputPath, { encoding: 'base64' }, async (err, base64) => {
+                                if (err) return client.sendText(from, config.msg.error('Ada yang error saat membaca file .webp\n\n' + err)) && _err(err)
+                                try {
+                                    await client.sendRawWebpAsSticker(from, base64, true)
+                                } catch (e) {
+                                    console.log(color('[ERROR]', 'red'), e)
+                                    client.sendText(from, config.msg.error('Ada yang error saat mengirim stiker\n\n' + e))
+                                }
+                                try {
+                                    fs.unlinkSync(fileInputPath)
+                                    fs.unlinkSync(fileOutputPath)
+                                } catch (e) {
+                                    console.log(color('[ERROR]', 'red'), e)
+                                }
+                            })
                         })
-                    // mhankbarbar('yta', '?url=' + encodeURIComponent(url))
-                    //     .then(res => res.json())
-                    //     .then(res => {
-                    //         if (res.status) {
-                    //             client.sendImage(from, res.thumb, 'thumbs.jpg', config.msg.yt(res.title, res.filesize), id)
-                    //             client.sendFileFromUrl(from, res.result, `music.${res.ext}`, config.msg.yt(res.title, res.filesize), id)
-                    //         } else {
-                    //             client.reply(from, config.msg.error(res.error), id)
-                    //             console.log(res.error)
-                    //         }
-                    //     })
-                    break
-                case c(/^((bot|)stat(s|)|botinfo|infobot)$/i, 'stat'):
-                    const loadedMsg = await client.getAmountOfLoadedMessages()
-                    const chatIds = await client.getAllChatIds()
-                    const groups = await client.getAllGroups()
-                    const me = await client.getMe()
-                    const battery = await client.getBatteryLevel()
-                    const isCharging = await client.getIsPlugged()
-                    const used = process.memoryUsage()
-                    client.sendText(from, `
+                        .save(fileOutputPath)
+                })
+            }
+        })
+
+        cmd.on('add', ['add', '+'], async () => {
+            args = cmd.args.join(' ').split(',').map(number => number.trim())
+            failed = permission([
+                [!isGroupMsg, config.msg.notGroup],
+                // [!isGroupAdmins, config.msg.notAdmin],
+                [!isBotGroupAdmins, config.msg.notBotAdmin],
+                [args.length === 0, config.msg.noArgs],
+                [args.includes(botNumber), config.msg.self],
+            ])
+            if (failed[0]) return client.reply(from, failed[1], id)
+            await client.sendTextWithMentions(from, config.msg.add + args.map(config.msg.listUser).join('\n'))
+            for (let i = 0; i < args.length; i++) {
+                client.addParticipant(groupId, args[i] + '@c.us')
+            }
+        })
+
+        cmd.on('kick', ['kick', '-'], async () => {
+            failed = permission([
+                [!isGroupMsg, config.msg.notGroup],
+                [!isGroupAdmins, config.msg.notAdmin],
+                [!isBotGroupAdmins, config.msg.notBotAdmin],
+                [cmd.args.length === 0, config.msg.noArgs],
+                [cmd.args.includes(botNumber), config.msg.self],
+            ])
+            if (failed[0]) return client.reply(from, failed[1], id)
+            await client.sendTextWithMentions(from, config.msg.remove + cmd.args.map(config.msg.listUser).join('\n'))
+            for (let i = 0; i < cmd.args.length; i++) {
+                client.removeParticipant(groupId, cmd.args[i] + '@c.us')
+            }
+        })
+
+        cmd.on('promote', ['promote', '^'], async () => {
+            failed = permission([
+                [!isGroupMsg, config.msg.notGroup],
+                [!isGroupAdmins, config.msg.notAdmin],
+                [!isBotGroupAdmins, config.msg.notBotAdmin],
+            ])
+            if (failed[0]) return client.reply(from, failed[1], id)
+            if (cmd.args.length > 0 && cmd.args[0] == '@a') mentionedJidList = groupMembers
+            else if (cmd.args.length > 0 && cmd.args[0] == '@r') mentionedJidList = pickRandom(groupMembers.filter(id => !groupAdmins.includes(id)))
+            failed = permission([
+                [mentionedJidList.length < 1, config.msg.noJid]
+            ])
+            if (failed[0]) return client.reply(from, failed[1], id)
+            for (let mentionid of mentionedJidList) {
+                if (groupAdmins.includes(mentionid)) {
+                    promises.push(_ => new Promise(r => r(false)))
+                    failedList.push(mentionid)
+                    continue
+                }
+                if (mentionid === botNumber) {
+                    promises.push(_ => new Promise(r => r(false)))
+                    failedList.push(mentionid)
+                    continue
+                }
+                promises.push(client.promoteParticipant(groupId, mentionid))
+                // let success = await client.promoteParticipant(groupId, mentionid)
+                // if (success) successList.push(mentionid)
+                // else failedList.push('Maaf, Error')
+            }
+            list = await Promise.all(promises)
+            for (let id in list) {
+                if (list[id]) successList.push(mentionedJidList[id])
+            }
+            client.sendTextWithMentions(from, config.msg.promoteFormat(successList, failedList))
+        })
+
+        cmd.on('demote', ['demote', 'v'], async () => {
+            failed = permission([
+                [!isGroupMsg, config.msg.notGroup],
+                [!isGroupAdmins, config.msg.notAdmin],
+                [!isBotGroupAdmins, config.msg.notBotAdmin],
+            ])
+            if (failed[0]) return client.reply(from, failed[1], id)
+            if (cmd.args.length > 0 && cmd.args[0] == '@a') mentionedJidList = groupMembers
+            else if (cmd.args.length > 0 && cmd.args[0] == '@r') mentionedJidList = pickRandom(groupAdmins)
+            failed = permission([
+                [mentionedJidList.length < 1, config.msg.noJid]
+            ])
+            if (failed[0]) return client.reply(from, failed[1], id)
+            for (let mentionid of mentionedJidList) {
+                if (groupAdmins.includes(mentionid)) {
+                    promises.push(_ => new Promise(r => r(false)))
+                    failedList.push(mentionid)
+                    continue
+                }
+                if (mentionid === botNumber) {
+                    promises.push(_ => new Promise(r => r(false)))
+                    failedList.push(mentionid)
+                    continue
+                }
+                promises.push(client.demoteParticipant(groupId, mentionid))
+                // let success = await client.promoteParticipant(groupId, mentionid)
+                // if (success) successList.push(mentionid)
+                // else failedList.push('Maaf, Error')
+            }
+            list = await Promise.all(promises)
+            for (let id in list) {
+                if (list[id]) successList.push(mentionedJidList[id])
+            }
+            client.sendTextWithMentions(from, config.msg.demoteFormat(successList, failedList))
+        })
+
+        cmd.on('resend', /^re(send|post)$/i, async () => {
+            if (quotedMsgObj) {
+                let encryptMedia
+                let replyOnReply = await client.getMessageById(quotedMsgObj.id)
+                let obj = replyOnReply.quotedMsgObj
+                if (/ptt|audio|video|image|document|sticker/.test(quotedMsgObj.type)) {
+                    encryptMedia = quotedMsgObj
+                    if (encryptMedia.animated) encryptMedia.mimetype = ''
+                } else if (obj && /ptt|audio|video|image/.test(obj.type)) {
+                    encryptMedia = obj
+                } else return
+                const _mimetype = encryptMedia.mimetype
+                const mediaData = await decryptMedia(encryptMedia)
+                await client.sendFile(from, `data:${_mimetype};base64,${mediaData.toString('base64')}`, 'file', ':)', encryptMedia.id)
+            } else client.reply(from, config.msg.noMedia, id)
+        })
+
+        cmd.on('ytv', /^yt((dl|)mp4|v)$/i, async () => {
+            failed = permission([
+                [!cmd.url, config.msg.notURL]
+            ])
+            if (failed[0]) return client.repl(from, failed[1], id)
+            ytv(cmd.url)
+                .then(res => {
+                    if (res.filesize > config.sizeLimit * 1000) return client.sendImage(from, res.thumb, 'thumbs.jpg', config.msg.yt(res.title, res.filesizeF) + '\n\nUse Link: ' + config.msg.sizeExceed(res.filesizeF), id)
+                    client.sendImage(from, res.thumb, 'thumbs.jpg', config.msg.yt(res.title, res.filesizeF) + '\n' + res.dl_link, id)
+                    client.sendFileFromUrl(from, res.dl_link, `media.${res.ext}`, config.msg.yt(res.title, res.filesizeF), id)
+                })
+        })
+
+        cmd.on('yta', /^yt((dl|)mp3|a)$/i, async () => {
+            failed = permission([
+                [!cmd.url, config.msg.notURL]
+            ])
+            if (failed[0]) return client.reply(from, failed[1], id)
+            yta(cmd.url)
+                .then(res => {
+                    client.sendImage(from, res.thumb, 'thumbs.jpg', config.msg.yt(res.title, res.filesizeF) + '\n' + res.dl_link, id)
+                    client.sendFileFromUrl(from, res.dl_link, `media.${res.ext}`, config.msg.yt(res.title, res.filesizeF), id)
+                })
+        })
+
+        cmd.on('botstat', /^((bot|)stat(s|)|botinfo|infobot)$/i, async () => {
+            const loadedMsg = await client.getAmountOfLoadedMessages()
+            const chatIds = await client.getAllChatIds()
+            const groups = await client.getAllGroups()
+            const me = await client.getMe()
+            const battery = await client.getBatteryLevel()
+            const isCharging = await client.getIsPlugged()
+            const used = process.memoryUsage()
+            client.sendText(from, `
 💬 Status :
 - *${loadedMsg}* Loaded Messages
 - *${groups.length}* Group Chats
@@ -513,401 +481,393 @@ ${Object.keys(me.phone).map(key => `${key} : ${me.phone[key]}`).join('\n')}
 
 💻 *${'Server Memory Usage'}* :
 ${monospace(
-                        Object.keys(used).map(key => `${key} : ${format(used[key])}`).join('\n')
-                    )}`)
-                    break
-                case c(/^[nt]ulis$/i, 'nulis'):
-                    text = text || (quotedMsgObj ? quotedMsgObj.body : '')
-                    failed = permission([
-                        [!text, config.msg.noArgs]
-                    ])
-                    text = text.split('\n').slice(0, 25)
-                    if (failed[0]) return client.reply(from, failed[1], id)
-                    else {
-                        let converter = new Writable();
-                        converter._write = chunk => {
-                            client.sendFile(from, `data:image/jpeg;base64,${chunk.toString('base64')}`, 'nulis.jpg', 'Sukses', id)
-                        }
-                        let output = await nulis(text)
-                        console.log(output)
-                        // for (let image of output) {
-                        PImage.encodeJPEGToStream(output, converter, 100)
-                        // }
-                        setTimeout(() => {
-                            converter.end()
-                            delete converter
-                        }, 5000)
-                    }
-                    // mhankbarbar('nulis', '?text=' + encodeURIComponent(text))
-                    //     .then(res => res.json())
-                    //     .then(res => {
-                    //         client.sendFile(from, res.result, 'nulis.jpg', '*Isi Teks*\n\n' + monospace(text), id)
-                    //     })
-                    break
-                case c(/^ig(dl|)$/i, 'ig'):
-                    failed = permission([
-                        [!url, config.msg.notURL]
-                    ])
-                    if (failed[0]) return client.repl(from, failed[1], id)
-                    mhankbarbar('ig', '?url=' + encodeURIComponent(url))
-                        .then(res => res.json())
-                        .then(res => {
-                            client.sendFile(from, res.result, 'ig', '', id)
+                Object.keys(used).map(key => `${key} : ${format(used[key])}`).join('\n')
+            )}`)
+        })
+
+        cmd.on('nulis', /^[nt]ulis$/i, async () => {
+            let text = cmd.text || (quotedMsgObj ? quotedMsgObj.body : '')
+            failed = permission([
+                [!text, config.msg.noArgs]
+            ])
+            if (failed[0]) return client.reply(from, failed[1], id)
+            let font = text2image.loadFont('./src/IndieFlower.ttf')
+            client.reply(from, config.msg.waitConvert('jpeg', 'png', '...'), id)
+            let pages = await nulis(font, text, 1)
+            for (let page of pages) {
+                client.sendImage(from, 'data:image/png;base64,' + page.toString('base64'), 'nulis.png', '-_-"', id)
+            }
+        })
+
+        cmd.on('ig', /^ig(dl|)$/i, async () => {
+            failed = permission([
+                [!cmd.url, config.msg.notURL]
+            ])
+            if (failed[0]) return client.repl(from, failed[1], id)
+            mhankbarbar('ig', '?url=' + encodeURIComponent(cmd.url))
+                .then(res => res.json())
+                .then(res => {
+                    client.sendFile(from, res.result, 'ig', '', id)
+                }).catch(_err)
+        })
+
+        cmd.on('source', 'source', async () => {
+            client.sendLinkWithAutoPreview(from, 'https://github.com/Nurutomo/nbot-wa', 'Repository:\nhttps://github.com/Nurutomo/nbot-wa')
+        })
+
+        cmd.on('mp3', ['mp3', 'audio'], async () => {
+            if ((isMedia || isQuotedVideo || isQuotedFile)) {
+                client.reply(from, config.msg.waitConvert('mp4', 'mp3', 'Meng-ekstrak audio dari video'), id)
+                const encryptMedia = isQuotedVideo || isQuotedFile ? quotedMsg : message
+                const _mimetype = isQuotedVideo || isQuotedFile ? quotedMsg.mimetype : mimetype
+                console.log(color('[WAPI]', 'green'), 'Downloading and decrypt media...')
+                const mediaData = await decryptMedia(encryptMedia)
+                let temp = './temp'
+                let name = new Date() * 1
+                let fileInputPath = path.join(temp, 'video', `${name}.${_mimetype.replace(/.+\//, '')}`)
+                let fileOutputPath = path.join(temp, 'audio', `${name}.mp3`)
+                console.log(color('[fs]', 'green'), `Downloading media into '${fileInputPath}'`)
+                fs.writeFile(fileInputPath, mediaData, err => {
+                    if (err) return client.sendText(from, 'Ada yang error saat menulis file\n\n' + err) && _err(err)
+                    // ffmpeg -y -t 5 -i <input_file> -vf "scale=512:512:flags=lanczos:force_original_aspect_ratio=decrease" -qscale 100 <output_file>.webp
+                    ffmpeg(fileInputPath)
+                        .format('mp3')
+                        .on('start', function (commandLine) {
+                            console.log(color('[FFmpeg]', 'green'), commandLine)
                         })
-                    break
-                case c(/^source$/i, 'source'):
-                    client.sendLinkWithAutoPreview(from, 'https://github.com/Nurutomo/nbot-wa', 'Repository:\nhttps://github.com/Nurutomo/nbot-wa')
-                    break
-                case c(/^(mp3|audio)$/i, 'mp3'):
-                    if ((isMedia || isQuotedVideo || isQuotedFile)) {
-                        client.reply(from, config.msg.waitConvert('mp4', 'mp3', 'Meng-ekstrak audio dari video'), id)
-                        const encryptMedia = isQuotedVideo || isQuotedFile ? quotedMsg : message
-                        const _mimetype = isQuotedVideo || isQuotedFile ? quotedMsg.mimetype : mimetype
-                        console.log(color('[WAPI]', 'green'), 'Downloading and decrypt media...')
-                        const mediaData = await decryptMedia(encryptMedia)
-                        let temp = './temp'
-                        let name = new Date() * 1
-                        let fileInputPath = path.join(temp, 'video', `${name}.${_mimetype.replace(/.+\//, '')}`)
-                        let fileOutputPath = path.join(temp, 'audio', `${name}.mp3`)
-                        console.log(color('[fs]', 'green'), `Downloading media into '${fileInputPath}'`)
-                        fs.writeFile(fileInputPath, mediaData, err => {
-                            if (err) return client.sendText(from, 'Ada yang error saat menulis file\n\n' + err) && console.log(color('[ERROR]', 'red'), err)
-                            // ffmpeg -y -t 5 -i <input_file> -vf "scale=512:512:flags=lanczos:force_original_aspect_ratio=decrease" -qscale 100 <output_file>.webp
-                            ffmpeg(fileInputPath)
-                                .format('mp3')
-                                .on('start', function (commandLine) {
-                                    console.log(color('[FFmpeg]', 'green'), commandLine)
-                                })
-                                .on('progress', function (progress) {
-                                    console.log(color('[FFmpeg]', 'green'), progress)
-                                })
-                                .on('end', function () {
-                                    console.log(color('[FFmpeg]', 'green'), 'Processing finished!')
-                                    // fs.readFile(fileOutputPath, { encoding: 'base64' }, (err, base64) => {
-                                    // if (err) return client.sendText(from, 'Ada yang error saat membaca file .mp3') && console.log(color('[ERROR]', 'red'), err)
-                                    client.sendFile(from, fileOutputPath, 'audio.mp3', '', id)
-                                    // })
-                                    setTimeout(() => {
-                                        try {
-                                            fs.unlinkSync(fileInputPath)
-                                            fs.unlinkSync(fileOutputPath)
-                                        } catch (e) {
-                                            console.log(color('[ERROR]', 'red'), e)
-                                        }
-                                    }, 30000)
-                                })
-                                .save(fileOutputPath)
+                        .on('progress', function (progress) {
+                            console.log(color('[FFmpeg]', 'green'), progress)
                         })
-                    }
-                    break
-                case c(/^ss(s|)$/i, 'ss'):
-                    let ss = await client.getSnapshot()
-                    let pic = await client.sendImage(from, ss, 'screenshot.png', '', id, true)
-                    setTimeout(() => {
-                        client.deleteMessage(pic.from, pic.id, false)
-                    }, 30000)
-                    break
-                case c(/^fs$/, 'fs'):
-                    client.sendText(from, monospace(tree(__dirname, { exclude: [/node_modules/, /status/], depth: 5 }).replace(/── (.+)/g, (_, group) => `── ${/\..+/.test(group) ? '📄' : '📁'} ${group}`)))
-                    break
-                case c(/^(earrape|distord|distorsi)$/i, 'distord'):
-                    if (isQuotedAudio) {
-                        client.reply(from, config.msg.waitConvert('mp3', 'wav', 'Biar mudah ngedit audionya ketika pake format itu'), id)
-                        const encryptMedia = isQuotedAudio ? quotedMsg : message
-                        const _mimetype = isQuotedAudio ? quotedMsg.mimetype : mimetype
-                        console.log(color('[WAPI]', 'green'), 'Downloading and decrypt media...')
-                        const mediaData = await decryptMedia(encryptMedia)
-                        Utils.decodeAudioData(mediaData, (err, audioBuffer) => {
-                            if (err) return client.sendText(from, config.msg.error('Ada yang error saat decoding file mp3\n\n' + e)) && console.log(e)
-                            generated = audioBuffer._data.map(channel => {
-                                return channel.map(value => clampFloat(distordFX(value)))
+                        .on('end', function () {
+                            console.log(color('[FFmpeg]', 'green'), 'Processing finished!')
+                            // fs.readFile(fileOutputPath, { encoding: 'base64' }, (err, base64) => {
+                            // if (err) return client.sendText(from, 'Ada yang error saat membaca file .mp3') && console.log(color('[ERROR]', 'red'), err)
+                            client.sendFile(from, fileOutputPath, 'audio.mp3', '', id)
+                            // })
+                            setTimeout(() => {
+                                try {
+                                    fs.unlinkSync(fileInputPath)
+                                    fs.unlinkSync(fileOutputPath)
+                                } catch (e) {
+                                    console.log(color('[ERROR]', 'red'), e)
+                                }
+                            }, 30000)
+                        })
+                        .save(fileOutputPath)
+                })
+            }
+        })
+
+        cmd.on('ss', /^ss(s|)$/i, async () => {
+            let ss = await client.getSnapshot()
+            let pic = await client.sendImage(from, ss, 'screenshot.png', '', id, true)
+            setTimeout(() => {
+                client.deleteMessage(pic.from, pic.id, false)
+            }, 20000)
+        })
+
+        cmd.on('fs', 'fs', async () => {
+            client.sendText(from, monospace(tree(__dirname, { exclude: [/node_modules/, /status/], depth: 5 }).replace(/── (.+)/g, (_, group) => `── ${/\..+/.test(group) ? '📄' : '📁'} ${group}`)))
+        })
+
+        cmd.on('distord', ['distord', 'distorsi', 'earrape'], async () => {
+            if (isQuotedAudio) {
+                client.reply(from, config.msg.waitConvert('mp3', 'wav', 'Biar mudah ngedit audionya ketika pake format itu'), id)
+                const encryptMedia = isQuotedAudio ? quotedMsg : message
+                const _mimetype = isQuotedAudio ? quotedMsg.mimetype : mimetype
+                console.log(color('[WAPI]', 'green'), 'Downloading and decrypt media...')
+                const mediaData = await decryptMedia(encryptMedia)
+                Utils.decodeAudioData(mediaData, (err, audioBuffer) => {
+                    if (err) return client.sendText(from, config.msg.error('Ada yang error saat decoding file mp3\n\n' + e)) && _err(err)
+                    generated = audioBuffer._data.map(channel => {
+                        return channel.map(value => clampFloat(distordFX(value)))
+                    })
+
+                    buffer = wav.encode(generated, {
+                        sampleRate: audioBuffer.sampleRate,
+                        float: true,
+                        bitDepth: 32
+                    })
+
+                    let temp = './temp'
+                    let name = new Date() * 1
+                    let fileInputPath = path.join(temp, 'audio', `${name}.wav`)
+                    let fileOutputPath = path.join(temp, 'audio', `${name}.mp3`)
+                    console.log(color('[fs]', 'green'), `Writing media into '${fileInputPath}'`)
+                    client.reply(from, config.msg.waitConvert('wav', 'mp3', 'Nah... sekarang dikembaliin lagi formatnya'), id)
+                    fs.writeFile(fileInputPath, buffer, err => {
+                        if (err) return client.sendText(from, config.msg.error('Ada yang error saat menulis file\n\n' + err)) && _err(err)
+                        ffmpeg(fileInputPath)
+                            .format('mp3')
+                            .on('start', function (commandLine) {
+                                console.log(color('[FFmpeg]', 'green'), commandLine)
                             })
-
-                            buffer = wav.encode(generated, {
-                                sampleRate: audioBuffer.sampleRate,
-                                float: true,
-                                bitDepth: 32
+                            .on('progress', function (progress) {
+                                console.log(color('[FFmpeg]', 'green'), progress)
                             })
-
-                            let temp = './temp'
-                            let name = new Date() * 1
-                            let fileInputPath = path.join(temp, 'audio', `${name}.wav`)
-                            let fileOutputPath = path.join(temp, 'audio', `${name}.mp3`)
-                            console.log(color('[fs]', 'green'), `Writing media into '${fileInputPath}'`)
-                            client.reply(from, config.msg.waitConvert('wav', 'mp3', 'Nah... sekarang dikembaliin lagi formatnya'), id)
-                            fs.writeFile(fileInputPath, buffer, err => {
-                                if (err) return client.sendText(from, config.msg.error('Ada yang error saat menulis file\n\n' + err)) && console.log(color('[ERROR]', 'red'), err)
-                                ffmpeg(fileInputPath)
-                                    .format('mp3')
-                                    .on('start', function (commandLine) {
-                                        console.log(color('[FFmpeg]', 'green'), commandLine)
-                                    })
-                                    .on('progress', function (progress) {
-                                        console.log(color('[FFmpeg]', 'green'), progress)
-                                    })
-                                    .on('end', function () {
-                                        console.log(color('[FFmpeg]', 'green'), 'Processing finished!')
-                                        // fs.readFile(fileOutputPath, { encoding: 'base64' }, (err, base64) => {
-                                        // if (err) return client.sendText(from, 'Ada yang error saat membaca file .mp3') && console.log(color('[ERROR]', 'red'), err)
-                                        client.sendFile(from, fileOutputPath, 'distorted.mp3', '', id)
-                                        // })
-                                        setTimeout(() => {
-                                            try {
-                                                fs.unlinkSync(fileInputPath)
-                                                fs.unlinkSync(fileOutputPath)
-                                            } catch (e) {
-                                                console.log(color('[ERROR]', 'red'), e)
-                                            }
-                                        }, 30000)
-                                    })
-                                    .save(fileOutputPath)
+                            .on('end', function () {
+                                console.log(color('[FFmpeg]', 'green'), 'Processing finished!')
+                                // fs.readFile(fileOutputPath, { encoding: 'base64' }, (err, base64) => {
+                                // if (err) return client.sendText(from, 'Ada yang error saat membaca file .mp3') && console.log(color('[ERROR]', 'red'), err)
+                                client.sendFile(from, fileOutputPath, 'distorted.mp3', '', id)
+                                // })
+                                setTimeout(() => {
+                                    try {
+                                        fs.unlinkSync(fileInputPath)
+                                        fs.unlinkSync(fileOutputPath)
+                                    } catch (e) { _err(e) }
+                                }, 30000)
                             })
-                        })
-                    }
-                    break
-                case c('ssweb', 'ssweb'):
-                    if (url) {
-                        try {
-                            if (!/^file|^http(s|):\/\//.test(url)) url = 'https://' + url
-                            let ss = await ssPage(url, args[1])
-                            client.sendImage(from, ss, 'screenshot.png', url, id)
-                        } catch (e) {
-                            client.reply(from, config.msg.error(e), id)
-                        }
-                    }
-                    break
-                case c('sswebf', 'sswebfull'):
-                    if (url) {
-                        try {
-                            if (!/^file|^http(s|):\/\//.test(url)) url = 'https://' + url
-                            let [ss, ssPDF] = await Promise.all([
-                                ssPage(url, args[1], true),
-                                // ssPage(url, args[1], true, true)
-                            ])
-                            client.sendImage(from, ss, 'screenshot.png', url, id)
-                            client.sendFile(from, ssPDF, 'screenshot.pdf', url, id)
-                        } catch (e) {
-                            client.reply(from, config.msg.error(e), id)
-                        }
-                    }
-                    break
-                case c('google', 'google'):
-                    if (url) {
-                        try {
-                            let url = 'https://google.com/search?q=' + encodeURIComponent(text)
-                            let [ss, ssFull, ssPDF] = await Promise.all([
-                                ssPage(url, 1000, false),
-                                ssPage(url, 1000, true),
-                                // ssPage(url, 1000, true, true)
-                            ])
-                            await client.sendImage(from, ss, 'screenshot.png', url, id)
-                            await client.sendImage(from, ssFull, 'screenshot.png', url, id)
-                            client.sendFile(from, ssPDF, 'screenshot.pdf', url, id)
-                        } catch (e) {
-                            client.reply(from, config.msg.error(e), id)
-                        }
-                    }
-                    break
-                case c('googlef', 'googleImage'):
-                    if (url) {
-                        try {
-                            let url = 'https://google.com/search?q=' + encodeURIComponent(text) + '&tbm=isch'
-                            let ss = await ssPage(url, 1000)
-                            client.sendImage(from, ss, 'screenshot.png', url, id)
-                        } catch (e) {
-                            client.reply(from, config.msg.error(e), id)
-                        }
-                    }
-                    break
-                case c(/^style|gaya$/i, 'style'):
-                    switch (useQuoted(text, quotedMsgObj)) {
-                        case !0:
-                            client.reply(from, (await stylizeText(quotedMsgObj.body)), id)
-                            break
-                        case !1:
-                            client.sendText(from, (await stylizeText(quotedMsgObj.body)))
-                            break
-                        default:
-                            client.reply(from, config.msg.noArgs, id)
-                    }
-                    break
-                case c(/^(bass(boost|)|fullbass)$/i, 'bass'):
-                    if (isQuotedAudio) {
-                        let dB = 20
-                        let freq = 60
-                        if (args[0]) dB = clamp(parseInt(args[0]) || 20, 0, 50)
-                        if (args[1]) freq = clamp(parseInt(args[1]) || 20, 20, 500)
-                        let mediaData = await decryptMedia(quotedMsg)
-                        let temp = './temp'
-                        let name = new Date() * 1
-                        let fileInputPath = path.join(temp, 'audio', `${name}.mp3`)
-                        let fileOutputPath = path.join(temp, 'audio', `${name}_2.mp3`)
-                        console.log(color('[fs]', 'green'), `Writing media into '${fileInputPath}'`)
-                        client.reply(from, config.msg.waitConvert('mp3', 'mp3', `Bass ${freq}hz: +${dB}dB`), id)
-                        fs.writeFile(fileInputPath, mediaData, err => {
-                            if (err) return client.sendText(from, config.msg.error('Ada yang error saat menulis file\n\n' + err)) && console.log(color('[ERROR]', 'red'), err)
-                            ffmpeg(fileInputPath)
-                                .audioFilter('equalizer=f=' + freq + ':width_type=o:width=2:g=' + dB)
-                                .format('mp3')
-                                .on('start', function (commandLine) {
-                                    console.log(color('[FFmpeg]', 'green'), commandLine)
-                                })
-                                .on('progress', function (progress) {
-                                    console.log(color('[FFmpeg]', 'green'), progress)
-                                })
-                                .on('end', function () {
-                                    console.log(color('[FFmpeg]', 'green'), 'Processing finished!')
-                                    // fs.readFile(fileOutputPath, { encoding: 'base64' }, (err, base64) => {
-                                    // if (err) return client.sendText(from, 'Ada yang error saat membaca file .mp3') && console.log(color('[ERROR]', 'red'), err)
-                                    client.sendFile(from, fileOutputPath, 'distorted.mp3', '', id)
-                                    // })
-                                    setTimeout(() => {
-                                        try {
-                                            fs.unlinkSync(fileInputPath)
-                                            fs.unlinkSync(fileOutputPath)
-                                        } catch (e) {
-                                            console.log(color('[ERROR]', 'red'), e)
-                                        }
-                                    }, 30000)
-                                })
-                                .save(fileOutputPath)
-                        })
-                    }
-                    break
-                case c(/^link(group|)$/i, 'linkGroup'):
-                // failed = permission([
-                //     [!isGroup, config.msg.notGroup]
-                // ])
-                // if (failed[0]) return client.reply(from, failed[1], id)
-                case c('test', 'test'):
-                    // let groups = await client.getAllGroups()
-                    // console.log(groups)
-                    break
-                case c('setuserrole', 'setUserRole'):
-                    failed = permission([
-                        [!isGroupMsg, config.msg.notGroup],
-                        [mentionedJidList.length < 1, config.msg.noJid]
-                    ])
-                    if (failed[0]) return client.reply(from, failed[1], id)
+                            .save(fileOutputPath)
+                    })
+                })
+            }
+        })
 
-                    let users = /@(\d{5,15}) (\d+)/g.exec(text)
-                    for (let [, user, role] of users) {
-                        if (group.setMemberRole(groupId, user + '@c.us', role)) successList.push('@' + user)
-                        else failedList.push('@' + user)
-                    }
-                    client.sendTextWithMentions(from, `Done:\n${successList.map(config.msg.listUser)}\n\nFailed:\n${failedList.map(config.msg.listUser)}`)
-                    break
-                case c('getuserrole', 'getUserRole'):
-                    failed = permission([
-                        [!isGroupMsg, config.msg.notGroup],
-                        [mentionedJidList.length < 1, config.msg.noJid]
-                    ])
-                    if (failed[0]) return client.reply(from, failed[1], id)
+        cmd.on('ssweb', 'ssweb', async () => {
+            if (cmd.url) {
+                try {
+                    if (!/^file|^http(s|):\/\//.test(cmd.url)) url = 'https://' + cmd.url
+                    else url = cmd.url
+                    let ss = await ssPage(url, cmd.args[1])
+                    client.sendImage(from, ss, 'screenshot.png', url, id)
+                } catch (e) {
+                    client.reply(from, config.msg.error(e), id)
+                }
+            }
+        })
 
-                    mentionedJidList.map(user => `@${user.replace('@c.us', '')} ${group.getRoleById(groupId, user)}`)
-                    client.sendTextWithMentions(from, `Done:\n${successList.map(config.msg.listUser)}\n\nFailed:\n${failedList.map(config.msg.listUser)}`)
-                    break
-                case c('setrole', 'setRole'):
-                    failed = permission([
-                        [!isGroupMsg, config.msg.notGroup],
-                        [args.length < 3, config.msg.noArgs]
+        cmd.on('sswebf', 'sswebf', async () => {
+            if (cmd.url) {
+                try {
+                    if (!/^file|^http(s|):\/\//.test(cmd.url)) url = 'https://' + cmd.url
+                    else url = cmd.url
+                    let [ss, ssPDF] = await Promise.all([
+                        ssPage(url, cmd.args[1], true),
+                        // ssPage(url, cmd.args[1], true, true)
                     ])
-                    if (failed[0]) return client.reply(from, failed[1], id)
+                    client.sendImage(from, ss, 'screenshot.png', url, id)
+                    client.sendFile(from, ssPDF, 'screenshot.pdf', url, id)
+                } catch (e) {
+                    client.reply(from, config.msg.error(e), id)
+                }
+            }
+        })
 
-                    if (args[1] === 'name') args[2] = args[2]
-                    else if (args[1] === 'id') args[2] = parseInt(args[2])
-                    else args[2] = !!args[2]
-                    if (group.setRole(groupId, args[0], args[1], args.slice(2).join(' '))) client.reply(from, config.msg.success, id)
-                    else client.reply(from, config.msg.failed, id)
-                    break
-                case c('rolelist', 'roleList'):
-                    failed = permission([
-                        [!isGroupMsg, config.msg.notGroup]
+        cmd.on('google', 'google', async () => {
+            if (cmd.url) {
+                try {
+                    let url = 'https://google.com/search?q=' + encodeURIComponent(cmd.text)
+                    let [ss, ssFull, ssPDF] = await Promise.all([
+                        ssPage(url, 1000, false),
+                        ssPage(url, 1000, true),
+                        // ssPage(cmd.url, 1000, true, true)
                     ])
-                    if (failed[0]) return client.reply(from, failed[1], id)
+                    await client.sendImage(from, ss, 'screenshot.png', url, id)
+                    await client.sendImage(from, ssFull, 'screenshot.png', url, id)
+                    client.sendFile(from, ssPDF, 'screenshot.pdf', url, id)
+                } catch (e) {
+                    client.reply(from, config.msg.error(e), id)
+                }
+            }
+        })
 
-                    client.sendText(from, group.data[groupId].roles.map(role => {
-                        return `*${role.name}*\n${monospace(JSON.stringify(role.name, null, 1))}`
-                    }).join('\n\n'))
+        cmd.on('style', /^style|gaya$/i, async () => {
+            switch (useQuoted(cmd.text, quotedMsgObj)) {
+                case !0:
+                    client.reply(from, (await stylizeText(quotedMsgObj.body).catch(_err)), id)
                     break
-                case c('broadcast', 'broadcast'):
-                    failed = permission([
-                        [!isOperator, config.msg.notAllowed]
-                    ])
-                    if (failed[0]) return client.reply(from, failed[1], id)
-                    client.reply(from, 'Mengirim broadcast...', id)
-                    for (let chatId in group.data) {
-                        if (group.data[chatId].broadcast) await client.sendTextWithMentions(chatId, config.msg.broadcast(sender, text))
-                    }
-                    break
-                case c('allowbroadcast', 'allowBroadcast'):
-                    failed = permission([
-                        [!isGroupMsg, config.msg.notGroup],
-                        [!isGroupAdmins, config.msg.notAdmin]
-                    ])
-                    if (failed[0]) return client.reply(from, failed[1], id)
-                    bool = /^(y|ya|yes|enable|activate|true|1)$/i.test(args[0])
-                    group.setAllowBroadcast(groupId, bool)
-                    client.reply(from, `Allow receive broadcast from bot to this group is now set to *${bool ? 'en' : 'dis'}abled*`, id)
-                    break
-                case c('keylist', 'keylist'):
-                    let keyList = [
-                        'name',
-                        'id',
-                        'ping',
-                        'sticker',
-                        'meme',
-                        'memesticker',
-                        'sgif',
-                        'add',
-                        'kick',
-                        'promote',
-                        'demote',
-                        'resend',
-                        'ytv',
-                        'yta',
-                        'stat',
-                        'nulis',
-                        'ig',
-                        'source',
-                        'mp3',
-                        'ss',
-                        'fs',
-                        'distord',
-                        'ssweb',
-                        'sswebfull',
-                        'google',
-                        'googleImage',
-                        'style',
-                        'bass',
-                        'linkGroup',
-                        'test',
-                        'setUserRole',
-                        'getUserRole',
-                        'setRole',
-                        'roleList',
-                        'allowBroadcast',
-                    ]
-                    client.reply(from, `List:\n${keyList.join('\n')}`)
+                case !1:
+                    client.sendText(from, (await stylizeText(cmd.text).catch(_err)))
                     break
                 default:
-                    console.log(color('[????]', 'red'), color(moment(t * 1000).format('DD/MM/YY HH:mm:ss'), 'yellow'), color(`${command} [${args.length}]`, 'red'), 'from', color(pushname), 'in', color(name || formattedTitle))
-                    break
+                    client.reply(from, config.msg.noArgs, id)
             }
-        } catch (e) {
+        })
+
+        cmd.on('bass', /^(bass(boost|)|fullbass)$/i, async () => {
+            if (isQuotedAudio) {
+                let dB = 20
+                let freq = 60
+                if (cmd.args[0]) dB = clamp(parseInt(cmd.args[0]) || 20, 0, 50)
+                if (cmd.args[1]) freq = clamp(parseInt(cmd.args[1]) || 20, 20, 500)
+                let mediaData = await decryptMedia(quotedMsg)
+                let temp = './temp'
+                let name = new Date() * 1
+                let fileInputPath = path.join(temp, 'audio', `${name}.mp3`)
+                let fileOutputPath = path.join(temp, 'audio', `${name}_2.mp3`)
+                console.log(color('[fs]', 'green'), `Writing media into '${fileInputPath}'`)
+                client.reply(from, config.msg.waitConvert('mp3', 'mp3', `Bass ${freq}hz: +${dB}dB`), id)
+                fs.writeFile(fileInputPath, mediaData, err => {
+                    if (err) return client.sendText(from, config.msg.error('Ada yang error saat menulis file\n\n' + err)) && _err(err)
+                    ffmpeg(fileInputPath)
+                        .audioFilter('equalizer=f=' + freq + ':width_type=o:width=2:g=' + dB)
+                        .format('mp3')
+                        .on('start', function (commandLine) {
+                            console.log(color('[FFmpeg]', 'green'), commandLine)
+                        })
+                        .on('progress', function (progress) {
+                            console.log(color('[FFmpeg]', 'green'), progress)
+                        })
+                        .on('end', function () {
+                            console.log(color('[FFmpeg]', 'green'), 'Processing finished!')
+                            // fs.readFile(fileOutputPath, { encoding: 'base64' }, (err, base64) => {
+                            // if (err) return client.sendText(from, 'Ada yang error saat membaca file .mp3') && console.log(color('[ERROR]', 'red'), err)
+                            client.sendFile(from, fileOutputPath, 'distorted.mp3', '', id)
+                            // })
+                            setTimeout(() => {
+                                try {
+                                    fs.unlinkSync(fileInputPath)
+                                    fs.unlinkSync(fileOutputPath)
+                                } catch (e) { _err(e) }
+                            }, 30000)
+                        })
+                        .save(fileOutputPath)
+                })
+            }
+        })
+
+        cmd.on('setuserrole', 'setuserrole', async () => {
+            failed = permission([
+                [!isGroupMsg, config.msg.notGroup],
+                [mentionedJidList.length < 1, config.msg.noJid]
+            ])
+            if (failed[0]) return client.reply(from, failed[1], id)
+
+            let users = /@(\d{5,15}) (\d+)/g.exec(cmd.text)
+            for (let [, user, role] of users) {
+                if (group.setMemberRole(groupId, user + '@c.us', role)) successList.push('@' + user)
+                else failedList.push('@' + user)
+            }
+            client.sendTextWithMentions(from, `Done:\n${successList.map(config.msg.listUser)}\n\nFailed:\n${failedList.map(config.msg.listUser)}`)
+        })
+
+        cmd.on('getuserrole', 'getuserrole', async () => {
+            failed = permission([
+                [!isGroupMsg, config.msg.notGroup],
+                [mentionedJidList.length < 1, config.msg.noJid]
+            ])
+            if (failed[0]) return client.reply(from, failed[1], id)
+
+            mentionedJidList.map(user => `@${user.replace('@c.us', '')} ${group.getRoleById(groupId, user)}`)
+            client.sendTextWithMentions(from, `Done:\n${successList.map(config.msg.listUser)}\n\nFailed:\n${failedList.map(config.msg.listUser)}`)
+        })
+
+        cmd.on('setrole', 'setrole', async () => {
+            failed = permission([
+                [!isGroupMsg, config.msg.notGroup],
+                [cmd.args.length < 3, config.msg.noArgs]
+            ])
+            if (failed[0]) return client.reply(from, failed[1], id)
+
+            if (cmd.args[1] === 'name') cmd.args[2] = cmd.args[2]
+            else if (cmd.args[1] === 'id') cmd.args[2] = parseInt(cmd.args[2])
+            else cmd.args[2] = !!cmd.args[2]
+            if (group.setRole(groupId, cmd.args[0], cmd.args[1], cmd.args.slice(2).join(' '))) client.reply(from, config.msg.success, id)
+            else client.reply(from, config.msg.failed, id)
+        })
+
+        cmd.on('rolelist', 'rolelist', async () => {
+            failed = permission([
+                [!isGroupMsg, config.msg.notGroup]
+            ])
+            if (failed[0]) return client.reply(from, failed[1], id)
+
+            client.sendText(from, group.data[groupId].roles.map(role => {
+                return `*${role.name}*\n${monospace(JSON.stringify(role.name, null, 1))}`
+            }).join('\n\n'))
+        })
+
+        cmd.on('broadcast', 'broadcast', async () => {
+            failed = permission([
+                [!isOperator, config.msg.notAllowed]
+            ])
+            if (failed[0]) return client.reply(from, failed[1], id)
+            client.reply(from, 'Mengirim broadcast...', id)
+            for (let chatId in group.data) {
+                if (group.data[chatId].broadcast) await client.sendTextWithMentions(chatId, config.msg.broadcast(sender, cmd.text))
+            }
+        })
+
+        cmd.on('allowbroadcast', 'allowbroadcast', async () => {
+            failed = permission([
+                [!isGroupMsg, config.msg.notGroup],
+                [!isGroupAdmins, config.msg.notAdmin]
+            ])
+            if (failed[0]) return client.reply(from, failed[1], id)
+            bool = /^(y|ya|yes|enable|activate|true|1)$/i.test(cmd.args[0])
+            group.setAllowBroadcast(groupId, bool)
+            client.reply(from, `Allow receive broadcast from bot to this group is now set to *${bool ? 'en' : 'dis'}abled*`, id)
+        })
+
+        cmd.on('ttsticker', ['ttsticker', 'ttstiker', 't2s'], async () => {
+            let text = cmd.text || (quotedMsgObj ? quotedMsgObj.body : '')
+            failed = permission([
+                [!text, config.msg.noArgs]
+            ])
+            if (failed[0]) return client.reply(from, failed[1], id)
+            let font = text2image.loadFont('C:\\Users\\LENOVO\\AppData\\Local\\Microsoft\\Windows\\Fonts\\Futura Bold Italic font.ttf')
+            let imgText = await text2image.convert(font, text.slice(0, 50), 0, 0, 512, {
+                attr: 'fill="#fff"'
+            })
+            let sticker = await processSticker(imgText)
+            client.sendRawWebpAsSticker(from, 'data:image/webp;base64,' + sticker.toString('base64'))
+        })
+
+        cmd.on('keylist', 'keylist', async () => {
+            client.reply(from, `List:\n${Object.keys(cmd._events).join('\n')}`)
+        })
+
+        cmd.check(body, true).then(data => {
+            console.log(data)
+            let tipe = bgColor(color(type.replace(/^./, (str) => str.toUpperCase()) + (from.startsWith('status') ? ' Status' : ''), 'black'), 'yellow')
+            if (data.pass) {
+                if (!isGroupMsg && sender && sender.isMe) console.log(color('[EXEC]'), color(moment(t * 1000).format('DD/MM/YY HH:mm:ss'), 'yellow'), color(`${cmd.command} [${cmd.args.length}]`), 'from', color(pushname), 'in', color(name || formattedTitle))
+                else if (!isGroupMsg) console.log(color('[EXEC]'), color(moment(t * 1000).format('DD/MM/YY HH:mm:ss'), 'yellow'), color(`${cmd.command} [${cmd.args.length}]`), 'from', color(pushname))
+                else if (isGroupMsg) console.log(color('[EXEC]'), color(moment(t * 1000).format('DD/MM/YY HH:mm:ss'), 'yellow'), color(`${cmd.command} [${cmd.args.length}]`), 'from', color(pushname), 'in', color(name || formattedTitle))
+            } else {
+                if (!isGroupMsg && sender && sender.isMe) console.log('[RECV]', color(moment(t * 1000).format('DD/MM/YY HH:mm:ss'), 'yellow'), `${tipe} from`, color(pushname)), 'in', color(name || formattedTitle)
+                else if (!isGroupMsg) console.log('[RECV]', color(moment(t * 1000).format('DD/MM/YY HH:mm:ss'), 'yellow'), `${tipe} from`, color(pushname))
+                else if (isGroupMsg) console.log('[RECV]', color(moment(t * 1000).format('DD/MM/YY HH:mm:ss'), 'yellow'), `${tipe} from`, color(pushname), 'in', color(name || formattedTitle))
+            }
+        }).catch(e => {
             console.log(color('[ERR]', 'red'), e)
-            if (usedPrefix) client.sendText(message.from, config.msg.error(e))
-        }
-    } catch (e) {
-        console.log(color('[ERR]', 'red'), e)
-    }
+            if (cmd.usedPrefix) client.sendText(message.from, config.msg.error(util.format(e)))
+        })
+    } catch (e) { _err(e) }
+}
+
+function _err(e) {
+    console.log(console.log(color('[ERR]', 'red'), e))
 }
 
 (async () => {
     if (global.browser) return
+    const chromePath = {
+        win32: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe', // Windows 32 bit
+        win64: 'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe', // Windows 64 bit
+        linuxChrome: '/usr/bin/google-chrome-stable', // Linux - Chrome
+        linuxChromium: '/usr/bin/chromium-browser', // Linux - Chromium
+        darwin: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' // MacOS
+    }
+
+    if (fs.existsSync(chromePath.win32)) {
+        execPath = chromePath.win32
+    } else if (fs.existsSync(chromePath.win64)) {
+        execPath = chromePath.win64
+    } else if (fs.existsSync(chromePath.linuxChrome)) {
+        execPath = chromePath.linuxChrome
+    } else if (fs.existsSync(chromePath.linuxChromium)) {
+        execPath = chromePath.linuxChromium
+    } else if (process.platform === 'darwin') {
+        execPath = chromePath.darwin
+    } else {
+        console.error(new Error('Google Chrome Is Not Installed'))
+        process.exit(1)
+    }
     console.log(chromeText, 'Launching Browser')
     global.browser = await puppeteer.launch({
-        executablePath: 'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+        executablePath: execPath,
         defaultViewport: {
             width: 1920,
             height: 1080
@@ -921,39 +881,6 @@ ${monospace(
 
     console.log(chromeText, 'Init Completed')
 })()
-
-function parseCmd(prefix = /^!/, msg = '') {
-    let usedPrefix = prefix.exec(msg)
-    let args = msg.replace(prefix, '').split(' ')
-    if (args[0] === '') args.shift()
-    let command = args.shift() || ''
-
-    return {
-        usedPrefix,
-        command,
-        args,
-        text: args.join(' '),
-        url: args[0],
-    }
-}
-
-function match(body, isGroup, groupId, id, onDisabled = () => { }) {
-    return (match, name) => {
-        if (true||name == '?' || (isGroup && group.permission(groupId, id, name)) || !isGroup) {
-            if (match instanceof RegExp) {
-                return match.test(body)
-            } else if (Array.isArray(match)) {
-                return match.includes(body)
-            } else {
-                return match === body
-            }
-        } else {
-            let reason = config.msg.notAllowed
-            // onDisabled(reason)
-            return false
-        }
-    }
-}
 
 function permission(rules) {
     for (let rule of rules) if (rule[0]) return rule
@@ -1009,6 +936,7 @@ function showHelp(prefix, name = '', command) {
 ║ 🔎 *${prefix}google* pencarian
 ║ 🔎 *${prefix}googlef* pencarian
 ║ 📄 *${prefix}nulis* teks
+║ 📄 *${prefix}ttstiker* teks
 ║
 ╟──── *Downloader* ────
 ║
@@ -1042,7 +970,7 @@ function showHelp(prefix, name = '', command) {
 ║
 ╟──── *Operator Only* ────
 ║
-║ **
+║ *${prefix}broadcast* text
 ║
 ╟──── *Iklan* ────
 ║
@@ -1068,8 +996,8 @@ function processSticker(input) {
                 background: { r: 0, g: 0, b: 0, alpha: 0 }
             })
             .toBuffer()
-            .then(data => resolve(data))
-            .catch((err) => reject(err))
+            .then(resolve)
+            .catch(reject)
     })
 }
 
@@ -1206,7 +1134,7 @@ function clampFloat(value) {
     return value > 1 ? 1 : value < -1 ? -1 : value
 }
 
-async function ssPage(url, delay = 0, isFull, isPDF) {
+async function ssPage(url = 'about:blank', delay = 0, isFull = false, isPDF = false) {
     return new Promise(async (resolve, reject) => {
         try {
             console.log(chromeText, 'Opening New Tab')
@@ -1283,21 +1211,17 @@ function clamp(value, min, max) {
     return Math.min(Math.max(min, value), max)
 }
 
-async function nulis(text) {
+async function nulis(font, text, pagesLimit = 38) {
     try {
-        let buku = await loadJPGImg(fs.createReadStream('./src/buku.jpg'))
+        let canvas = sharp('./src/buku.jpg')
         let output = []
-        let tulisan = PImage.make(buku.width, buku.height);
-        let splitter = []
-        let ctx = tulisan.getContext('2d');
-        ctx.font = "27pt IndieFlower";
-        ctx.drawImage(buku, 0, 0, buku.width, buku.height)
+        let spliter = []
 
         if (!Array.isArray(text)) {
             let tempkata = ''
             let kata = ''
             for (let i of [...text]) {
-                if (i != '\n' && measureText(ctx, tempkata + i).width < 734) tempkata += i
+                if (i != '\n' && font.getAdvanceWidth(tempkata + i, 27).width < 734) tempkata += i
                 else {
                     kata += tempkata + '\n'
                     tempkata = ''
@@ -1308,13 +1232,20 @@ async function nulis(text) {
         } else spliter = text
 
         let line = 222
-        ctx.fillStyle = '#000';
+        let lines = []
         for (let i of spliter.slice(0, 25)) {
-            ctx.fillText(i, 170, line)
+            lines.push(text2image.convert(font, i, 170, line, 27))
             line += 39.5
         }
-        output.push(tulisan)
-        if (spliter.length > 25) output.push(...nulis(spliter.slice(25)))
+        lines = await Promise.all(lines)
+        canvas = canvas.composite(lines.map(a => {
+            return { input: a, gravity: 'northwest'}
+        }))
+        output.push(canvas.toBuffer())
+        if (spliter.length > 25 && pagesLimit > 1) {
+            let pages = await nulis(font, spliter.slice(25), pagesLimit - 1)
+            output.push(...pages)
+        }
         return output
     } catch (e) {
         console.log(e)
@@ -1357,8 +1288,8 @@ function ytv(url) {
                                 dl_link: /<a.+?href="(.+?)"/.exec(res.result)[1],
                                 thumb, title, filesizeF: filesize, filesize: KB
                             })
-                        })
-                })
+                        }).catch(reject)
+                }).catch(reject)
         } else reject('URL INVALID')
     })
 }
@@ -1398,8 +1329,8 @@ function yta(url) {
                                 dl_link: /<a.+?href="(.+?)"/.exec(res.result)[1],
                                 thumb, title, filesizeF: filesize, filesize: KB
                             })
-                        })
-                })
+                        }).catch(reject)
+                }).catch(reject)
         } else reject('URL INVALID')
     })
 }

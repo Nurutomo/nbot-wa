@@ -19,7 +19,7 @@
   },
   "license": "ISC",
   "dependencies": {
-    "@open-wa/wa-automate": "^3.0.14",
+    "@open-wa/wa-automate": "^3.0.15",
     "chalk": "^4.1.0",
     "file-type": "^16.0.0",
     "fluent-ffmpeg": "^2.1.2",
@@ -30,9 +30,10 @@
     "moment-timezone": "^0.5.31",
     "node-fetch": "^2.6.1",
     "node-wav": "0.0.2",
-    "pureimage": "^0.2.5",
     "puppeteer": "^5.2.1",
+    "pureimage": "^0.2.5",
     "sharp": "^0.26.2",
+    "text2image": "^1.0.4",
     "tree-node-cli": "^1.4.0",
     "web-audio-api": "^0.2.2"
   }
