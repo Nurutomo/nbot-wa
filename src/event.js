@@ -39,12 +39,12 @@ class CMDEvent {
                     try {
                         if (externalDisable) {
                             this.middleware(() => {
-                                callback.apply(this, args)
                                 resolve({ pass: true, name: eventName, data: this._events[eventName] })
+                                callback.apply(this, args)
                             })
                         } else {
-                            callback.apply(this, args)
                             resolve({ pass: true, name: eventName, data: this._events[eventName] })
+                            callback.apply(this, args)
                         }
                         return
                     } catch (e) { reject(e) }
