@@ -4,9 +4,9 @@
 </p>
 
 # Pre-Installation
-- Download **Git** [here](https://git-scm.com/downloads)
-- Download **NodeJS** [here](https://nodejs.org/en/download/)
-- Download **FFmpeg** [here](https://www.gyan.dev/ffmpeg/builds/)
+- Download **Git** [here](https://git-scm.com/downloads) (Termux: `pkg install git`)
+- Download **NodeJS** [here](https://nodejs.org/en/download/) (Termux: `pkg install nodejs`)
+- Download **FFmpeg** [here](https://www.gyan.dev/ffmpeg/builds/) (Termux: `pkg install ffmpeg`)
 
 # Installation
 Type these on `cmd`, optional: `npm i node-gyp`
@@ -24,7 +24,7 @@ or
 node . <sessionName>
 ```
 
-Prefixes: `!, @, #, $, %, ^, &, /, .`
+Default Prefixes: `!, @, #, $, %, ^, &, /, .`
 # Features
 | Features                                     |                   Supported                  |
 |----------------------------------------------|:--------------------------------------------:|
@@ -44,3 +44,10 @@ Prefixes: `!, @, #, $, %, ^, &, /, .`
 | Broadcast (Need to enable on each group)     |                      Yes                     |
 | Broadcast Permission                         |                      Yes                     |
 | Instagram Downloader                         | Unlikely ([API](mhankbarbar-api--nurutomo.repl.co)) |
+
+# Environment Variables
+Windows: `set VARIABLENAME=VALUE`
+Linux/Termux: `VARIABLENAME=VALUE`
+
+## List
+- `prefix` RegExp Prefixes `prefix=[!#%]` will set prefix to `!, #, %`
