@@ -7,10 +7,19 @@ class Database {
         this.load()
     }
 
+    get data() {
+        return this._data
+    }
+
+    set data(value) {
+        this._data = value
+        this.save()
+    }
+
     load() {
-        if (fs.existsSync(this.file)) this.data = JSON.parse(fs.readFileSync(this.file))
-        else this.data = {}
-        return this.data
+        if (fs.existsSync(this.file)) this._data = JSON.parse(fs.readFileSync(this.file))
+        else this._data = {}
+        return this._data
     }
 
     save() {
@@ -18,7 +27,7 @@ class Database {
         if (!fs.existsSync(dirname)) {
             fs.mkdirSync(dirname, { recursive: true })
         }
-        fs.writeFileSync(this.file, JSON.stringify(this.data))
+        fs.writeFileSync(this.file, JSON.stringify(this._data))
     }
 }
 
@@ -157,11 +166,11 @@ class GroupData extends Database {
     }
 
     permission(groupId, id, name) {
-        if (!this.data[groupId]) return false
-        if (!this.data[groupId].member) return false
-        if (!this.data[groupId].member[id]) return false
+        if (!this.data[groupId]) return true
+        if (!this.data[groupId].member) return true
+        if (!this.data[groupId].member[id]) return true
         if (this.data[groupId].member[id].isAdmin) return true
-        if (!this.data[groupId].roles) return false
+        if (!this.data[groupId].roles) return true
         if (this.data[groupId].roles.length < 1) return true
         let roleId = this.getMemberRole(groupId, id)
         let roles = this.data[groupId].roles.filter(role => role.id == roleId)
@@ -169,7 +178,7 @@ class GroupData extends Database {
         if (roles.length == 0) return true
         let isAllowed = false
         for (let isOk of roles) {
-            isAllowed = isAllowed || isOk[name]
+            isAllowed = isAllowed || (isOk.hasOwnProperty(name) && isOk[name]) || (!isOk.hasOwnProperty(name))
         }
         return isAllowed
     }
@@ -185,3 +194,4 @@ module.exports = {
     GroupData,
     UserData
 }
+delete require.cache[require.resolve(__filename)]

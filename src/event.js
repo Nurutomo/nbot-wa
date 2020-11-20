@@ -39,18 +39,27 @@ class CMDEvent {
                     try {
                         if (externalDisable) {
                             this.middleware(() => {
-                                resolve({ pass: true, name: eventName, data: this._events[eventName] })
-                                callback.apply(this, args)
-                            })
+                                resolve({ pass: true, known: true, name: eventName, data: this._events[eventName] })
+                                try {
+                                    callback.apply(this, args)
+                                } catch (e) {   
+                                    e.usedPrefix = cmd.usedPrefix
+                                    reject(e)
+                                }
+                            }, eventName, this._events[eventName])
                         } else {
-                            resolve({ pass: true, name: eventName, data: this._events[eventName] })
+                            resolve({ pass: true, known: true, name: eventName, data: this._events[eventName] })
                             callback.apply(this, args)
                         }
                         return
-                    } catch (e) { reject(e) }
+                    } catch (e) {
+                        e.usedPrefix = cmd.usedPrefix
+                        reject(e)
+                    }
                 }
             }
-            resolve({ pass: false })
+            if (this.usedPrefix) resolve({ pass: true, known: false })
+            else resolve({ pass: false, known: false })
         })
     }
 
@@ -80,3 +89,4 @@ class CMDEvent {
 }
 
 module.exports = CMDEvent
+delete require.cache[require.resolve(__filename)]

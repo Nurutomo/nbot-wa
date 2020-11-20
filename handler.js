@@ -1,13 +1,13 @@
 // Config
-const config = {
+var config = {
     botName: '🔹 𝙉 O T 🔹',
-    operator: [],
+    operator: ['6281515860089'].map(id => id.replace(/[^\d]/g, '') + '@c.us'),
     prefix: process.env.prefix ? new RegExp('^' + process.env.prefix) : /^[!@#$%^&.\/\\^]/,
     downloadStatus: false, // Curi Status Orang :|
     msg: {
-        notAdmin: '🔰 Maaf anda bukan admin',
+        notAdmin: '🔰 Maaf anda bukan admin grup',
         notGroup: '👨‍👩‍👧‍👦 Fitur ini hanya bisa digunakan di grup',
-        notBotAdmin: '🔰 Bot belum menjadi admin',
+        notBotAdmin: '🔰 Bot belum menjadi admin grup',
         notURL: '🌐 Tidak ada URL',
         noMedia: '📷 Tidak ada Media',
         noArgs: '❓ Tidak ada argumen',
@@ -34,13 +34,35 @@ const config = {
         yt: (title, filesize) => `*${title}*\n\n💾 Filesize: ${filesize}`,
         recommend: (prefix, command) => `Direkomendasikan pakai *${prefix + command}*`,
         sizeExceed: size => `❌ Ukuran file melebihi batas yang ditentukan\n💾 Filesize: *${size}*\n📈 Limit: *${config.sizeLimit} MB*`,
-        waitConvert: (a, b, desc) => `⏱ Tunggu beberapa detik!\nSedang melakukan proses konversi *${a}* → *${b}*${desc ? `\n\n_${desc}_` : ''}`,
+        waitConvert: (a, b, desc) => `⏱ Tunggu beberapa detik!\nSedang melakukan proses konversi *${a}* → *${b}*${desc ? `\n\n${desc.split('\n').map(v => `_${v}_`).join('\n')}` : ''}`,
         broadcast: (sender, msg) => `📢 *BROADCAST* 📢\n_From: @${sender.id}_\n\n${msg}`,
         error: e => `⚠ *ERROR* ⚠\n\n${e}`,
+        ytsearch: item => {
+            switch (item.type) {
+                case 'video':
+                    return `
+*${item.type}*
+├> Judul: ${item.title}
+├> Durasi: ${item.duration[0]} (${item.duration[1]})
+├> Channel: ${item.author.name} ${item.author.verified ? item.author.verified == 'artist' ? '🎶' : '✅' : ''}
+├> Link: ${item.link}
+├> Deskripsi: ${item.description}
+`.slice(1, -1)
+                case 'channel':
+                    return `
+*${item.type}*
+├> Nama: ${item.title} ${item.verified ? item.verified == 'artist' ? '🎶' : '✅' : ''}
+├> Jumlah Video: ${item.videoCount}
+├> Subscriber: ${item.subscriberCount}
+├> Link: ${item.link}
+├> Deskripsi: ${item.description}
+`.slice(1, -1)
+            }
+        }
     },
     iklan: [
         'Anda butuh API? Sini aja:v https://st4rz.herokuapp.com (Iklan by https://wa.me/6285221100126)',
-        'Grup: https://chat.whatsapp.com/EN08hYxatxgJXdxo9dsART',
+        // 'Grup: https://chat.whatsapp.com/EN08hYxatxgJXdxo9dsART',
         'Github: https://github.com/Nurutomo/nbot-wa',
         'API: https://repl.it/@Nurutomo/MhankBarBar-Api',
     ],
@@ -48,7 +70,7 @@ const config = {
         fps: 30, // Lumayan
         quality: 1, // Buriq?
         target: '1M',
-        duration: 20 // Detik (Durasi Maksimal)
+        duration: 15 // Detik (Durasi Maksimal)
     },
     sizeLimit: '50', // Megabytes
     API: {
@@ -69,7 +91,7 @@ const config = {
 const fs = require('fs')
 const path = require('path')
 const util = require('util')
-const { Writable } = require('stream')
+const { Readable, Writable } = require('stream')
 
 // Local Modules
 const { GroupData } = require('./src/database')
@@ -79,44 +101,36 @@ const cmd = new _event()
 cmd.prefix = config.prefix
 
 // External Modules
-const text2image = require('text2image')
-const ffmpeg = require('fluent-ffmpeg')
 const sharp = require('sharp')
-const { decryptMedia, Client, message } = require('@open-wa/wa-automate')
-const fetch = require('node-fetch')
 const chalk = require('chalk')
-const moment = require('moment-timezone')
-moment.tz.setDefault('Asia/Jakarta').locale('id')
-const { fromBuffer } = require('file-type')
-const puppeteer = require('puppeteer')
-const chromeText = bgColor(color(`[${color('Ch', '#1DA462') + color('ro', '#DD5144') + color('me', '#FFCD46')}]`, '#4C8BF5'), '#112')
-const FormData = require('form-data')
-// const dirTree = require("directory-tree")
-const tree = require('tree-node-cli');
-const Utils = require('web-audio-api/build/utils')
-const wav = require('node-wav')
 const { JSDOM } = require('jsdom')
-const PImage = require('pureimage')
-const { measureText } = require('pureimage/src/text.js')
-try {
-    var font = PImage.registerFont('IndieFlower.ttf', 'IndieFlower').loadSync()
-} catch (e) { }
+const fetch = require('node-fetch')
+const FormData = require('form-data')
+const tree = require('tree-node-cli')
+const puppeteer = require('puppeteer')
+const ffmpeg = require('fluent-ffmpeg')
+const text2image = require('text2image')
+const moment = require('moment-timezone')
+const { fromBuffer } = require('file-type')
 const { sizeFormatter } = require('human-readable')
-const { gravity } = require('sharp')
+const translate = require('google-translate-open-api')
+const { decryptMedia, Client } = require('@open-wa/wa-automate')
+// const  = require('')
+
+moment.tz.setDefault('Asia/Jakarta').locale('id')
 const format = sizeFormatter({
     std: 'JEDEC', // 'SI' (default) | 'IEC' | 'JEDEC'
     decimalPlaces: 2,
     keepTrailingZeroes: false,
     render: (literal, symbol) => `${literal} ${symbol}B`,
 })
-// const  = require('')
 
 // Internal Modules
 const AsyncFunction = Object.getPrototypeOf(async function () { }).constructor
 
 // Variables
 const ytIdRegex = /(?:http(?:s|):\/\/|)(?:(?:www\.|)youtube(?:\-nocookie|)\.com\/(?:watch\?.*(?:|\&)v=|embed\/|v\/)|youtu\.be\/)([-_0-9A-Za-z]{11})/
-var buku
+const chromeText = bgColor(color(`[${color('Ch', '#1DA462') + color('ro', '#DD5144') + color('me', '#FFCD46')}]`, '#4C8BF5'), '#112')
 
 module.exports = async (client = new Client(), message) => {
     try {
@@ -177,26 +191,31 @@ module.exports = async (client = new Client(), message) => {
             message.body :
             (type === 'image' || type === 'video') && caption ?
                 message.caption : ''
-        if (rawText.startsWith('> ')/* && sender.id == ownerNumber*/) {
+        if (rawText.startsWith('> ') /* && sender.id == ownerNumber*/) {
             console.log(sender.id, 'is trying to use the execute command')
             let type = Function
             if (/await/.test(rawText)) type = AsyncFunction
-            let func = new type('print', 'client', 'message', 'config', 'group', rawText.slice(2))
+            let func = new type('print', 'client', 'message', 'config', 'group', 'fetch', 'fs', 'cmd', rawText.slice(2))
             let output
             try {
                 output = func((...args) => {
                     console.log(...args)
                     client.reply(from, util.format(...args), id)
-                }, client, message, config, group)
+                }, client, message, config, group, fetch, fs, cmd)
+                console.log(output)
                 await client.reply(from, '*Console Output*\n\n' + util.format(output), id)
             } catch (e) {
                 await client.reply(from, '*Console Error*\n\n' + util.format(e), id)
             }
         }
 
-        // cmd.middleware = next => {
-        //     return next()
+        if (isGroupMsg) group.update(chat.id, chat.groupMetadata)
+
+        // cmd.middleware = (next, name) => {
+        //     if (group.permission(groupId, sender.id, name)) next()
+        //     else client.reply(from, config.msg.notAllowed)
         // }
+        cmd.middleware = next => next()
 
         cmd.on('help', ['menu', 'help', '?'], () => {
             client.reply(from, showHelp(cmd.usedPrefix, pushname, cmd.args[0]), id)
@@ -261,17 +280,9 @@ module.exports = async (client = new Client(), message) => {
                 console.log(color('[WAPI]'), 'Downloading and decrypting media...')
                 const mediaData = await decryptMedia(encryptMedia)
                 if (_mimetype === 'image/webp') client.sendRawWebpAsSticker(from, mediaData.toString('base64'), true)
-                let temp = './temp'
-                let name = new Date() * 1
-                let fileInputPath = path.join(temp, /(.+)\//.exec(_mimetype)[1], `${name}.${_mimetype.replace(/.+\//, '')}`)
-                let fileOutputPath = path.join(temp, 'webp', `${name}.webp`)
-                console.log(color('[fs]'), `Writing media file into '${fileInputPath}'`)
-                fs.writeFile(fileInputPath, mediaData, err => {
-                    if (err) return client.sendText(from, config.msg.error('Ada yang error saat menulis file\n\n' + err)) && _err(err)
-                    // ffmpeg -y -t 5 -i <input_file> -vf "scale=512:512:flags=lanczos:force_original_aspect_ratio=decrease" -qscale 100 <output_file>.webp
-                    ffmpeg(fileInputPath)
+                stream2Buffer(write => {
+                    ffmpeg(buffer2Stream(mediaData))
                         .inputOptions([
-                            '-y',
                             '-t', config.stickerGIF.duration
                         ])
                         .complexFilter([
@@ -288,32 +299,13 @@ module.exports = async (client = new Client(), message) => {
                             '-vsync', '0'
                         ])
                         .format('webp')
-                        .on('start', function (commandLine) {
-                            console.log(color('[FFmpeg]'), commandLine)
-                        })
-                        .on('progress', function (progress) {
-                            console.log(color('[FFmpeg]'), progress, '')
-                        })
-                        .on('end', function () {
-                            console.log(color('[FFmpeg]'), 'Processing finished!')
-                            fs.readFile(fileOutputPath, { encoding: 'base64' }, async (err, base64) => {
-                                if (err) return client.sendText(from, config.msg.error('Ada yang error saat membaca file .webp\n\n' + err)) && _err(err)
-                                try {
-                                    await client.sendRawWebpAsSticker(from, base64, true)
-                                } catch (e) {
-                                    console.log(color('[ERROR]', 'red'), e)
-                                    client.sendText(from, config.msg.error('Ada yang error saat mengirim stiker\n\n' + e))
-                                }
-                                try {
-                                    fs.unlinkSync(fileInputPath)
-                                    fs.unlinkSync(fileOutputPath)
-                                } catch (e) {
-                                    console.log(color('[ERROR]', 'red'), e)
-                                }
-                            })
-                        })
-                        .save(fileOutputPath)
-                })
+                        .on('start', commandLine => console.log(color('[FFmpeg]'), commandLine))
+                        .on('progress', progress => console.log(color('[FFmpeg]'), progress))
+                        .on('end', () => console.log(color('[FFmpeg]'), 'Processing finished!'))
+                        .stream(write)
+                }).then(buffer => {
+                    client.sendRawWebpAsSticker(from, buffer.toString('base64'), true)
+                }).catch(_err)
             }
         })
 
@@ -425,15 +417,26 @@ module.exports = async (client = new Client(), message) => {
                 let encryptMedia
                 let replyOnReply = await client.getMessageById(quotedMsgObj.id)
                 let obj = replyOnReply.quotedMsgObj
-                if (/ptt|audio|video|image|document|sticker/.test(quotedMsgObj.type)) {
-                    encryptMedia = quotedMsgObj
-                    if (encryptMedia.animated) encryptMedia.mimetype = ''
-                } else if (obj && /ptt|audio|video|image/.test(obj.type)) {
-                    encryptMedia = obj
-                } else return
+                if (/ptt|audio|video|image|document|sticker/.test(quotedMsgObj.type)) encryptMedia = quotedMsgObj
+                else if (obj && /ptt|audio|video|image/.test(obj.type)) encryptMedia = obj
+                else return
                 const _mimetype = encryptMedia.mimetype
+                console.log(color('[WAPI]', 'green'), 'Downloading and decrypt media...')
                 const mediaData = await decryptMedia(encryptMedia)
-                await client.sendFile(from, `data:${_mimetype};base64,${mediaData.toString('base64')}`, 'file', ':)', encryptMedia.id)
+
+                if (encryptMedia.animated) {
+                    client.reply(from, config.msg.waitConvert('webp', 'mp4', 'Kebalikan dari gifstiker'), id)
+                    stream2Buffer(write => {
+                        ffmpeg(buffer2Stream(mediaData))
+                            .format('mp4')
+                            .on('start', commandLine => console.log(color('[FFmpeg]'), commandLine))
+                            .on('progress', progress => console.log(color('[FFmpeg]'), progress))
+                            .on('end', () => console.log(color('[FFmpeg]'), 'Processing finished!'))
+                            .stream(write)
+                    }).then(buffer => {
+                        client.sendRawWebpAsSticker(from, buffer.toString('base64'), true)
+                    }).catch(_err)
+                } else client.sendFile(from, baseURI(mediaData, _mimetype), `file.${_mimetype.replace(/.+\//, '')}`, ':)', encryptMedia.id)
             } else client.reply(from, config.msg.noMedia, id)
         })
 
@@ -441,13 +444,14 @@ module.exports = async (client = new Client(), message) => {
             failed = permission([
                 [!cmd.url, config.msg.notURL]
             ])
-            if (failed[0]) return client.repl(from, failed[1], id)
+            if (failed[0]) return client.reply(from, failed[1], id)
             ytv(cmd.url)
                 .then(res => {
                     if (res.filesize > config.sizeLimit * 1000) return client.sendImage(from, res.thumb, 'thumbs.jpg', config.msg.yt(res.title, res.filesizeF) + '\n\nUse Link: ' + config.msg.sizeExceed(res.filesizeF), id)
                     client.sendImage(from, res.thumb, 'thumbs.jpg', config.msg.yt(res.title, res.filesizeF) + '\n' + res.dl_link, id)
                     client.sendFileFromUrl(from, res.dl_link, `media.${res.ext}`, config.msg.yt(res.title, res.filesizeF), id)
                 })
+                .catch(_err)
         })
 
         cmd.on('yta', /^yt((dl|)mp3|a)$/i, async () => {
@@ -460,6 +464,7 @@ module.exports = async (client = new Client(), message) => {
                     client.sendImage(from, res.thumb, 'thumbs.jpg', config.msg.yt(res.title, res.filesizeF) + '\n' + res.dl_link, id)
                     client.sendFileFromUrl(from, res.dl_link, `media.${res.ext}`, config.msg.yt(res.title, res.filesizeF), id)
                 })
+                .catch(_err)
         })
 
         cmd.on('botstat', /^((bot|)stat(s|)|botinfo|infobot)$/i, async () => {
@@ -489,7 +494,7 @@ ${monospace(
             )}`)
         })
 
-        cmd.on('nulis', /^[nt]ulis$/i, async () => {
+        cmd.on('nulis', /^(mager|)[nt]ulis$/i, async () => {
             let text = cmd.text || (quotedMsgObj ? quotedMsgObj.body : '')
             failed = permission([
                 [!text, config.msg.noArgs]
@@ -499,9 +504,9 @@ ${monospace(
             // client.reply(from, config.msg.waitConvert('jpeg', 'png', '...'), id)
             let pages = await nulis(font, text, 1)
             console.log(pages)
-            client.sendFile(from, 'data:image/jpg;base64,' + pages.toString('base64'), 'nulis.png', '-_-"', id)
+            client.sendFile(from, 'data:image/jpg;base64,' + pages.toString('base64'), 'nulis.png', ':v', id)
             // for (let i = 0; i < pages.length; i++) {
-            //     client.sendFile(from, 'data:image/jpg;base64,' + pages[i].toString('base64'), 'nulis.png', '-_-"', id)
+            //     client.sendFile(from, 'data:image/jpg;base64,' + pages[i].toString('base64'), 'nulis.png', ':v', id)
             // }
         })
 
@@ -528,43 +533,29 @@ ${monospace(
                 const _mimetype = isQuotedVideo || isQuotedFile ? quotedMsg.mimetype : mimetype
                 console.log(color('[WAPI]', 'green'), 'Downloading and decrypt media...')
                 const mediaData = await decryptMedia(encryptMedia)
-                let temp = './temp'
-                let name = new Date() * 1
-                let fileInputPath = path.join(temp, 'video', `${name}.${_mimetype.replace(/.+\//, '')}`)
-                let fileOutputPath = path.join(temp, 'audio', `${name}.mp3`)
-                console.log(color('[fs]', 'green'), `Downloading media into '${fileInputPath}'`)
-                fs.writeFile(fileInputPath, mediaData, err => {
-                    if (err) return client.sendText(from, 'Ada yang error saat menulis file\n\n' + err) && _err(err)
-                    // ffmpeg -y -t 5 -i <input_file> -vf "scale=512:512:flags=lanczos:force_original_aspect_ratio=decrease" -qscale 100 <output_file>.webp
-                    ffmpeg(fileInputPath)
+                stream2Buffer(write => {
+                    ffmpeg(buffer2Stream(mediaData))
                         .format('mp3')
-                        .on('start', function (commandLine) {
-                            console.log(color('[FFmpeg]', 'green'), commandLine)
-                        })
-                        .on('progress', function (progress) {
-                            console.log(color('[FFmpeg]', 'green'), progress)
-                        })
-                        .on('end', function () {
-                            console.log(color('[FFmpeg]', 'green'), 'Processing finished!')
-                            // fs.readFile(fileOutputPath, { encoding: 'base64' }, (err, base64) => {
-                            // if (err) return client.sendText(from, 'Ada yang error saat membaca file .mp3') && console.log(color('[ERROR]', 'red'), err)
-                            client.sendFile(from, fileOutputPath, 'audio.mp3', '', id)
-                            // })
-                            setTimeout(() => {
-                                try {
-                                    fs.unlinkSync(fileInputPath)
-                                    fs.unlinkSync(fileOutputPath)
-                                } catch (e) {
-                                    console.log(color('[ERROR]', 'red'), e)
-                                }
-                            }, 30000)
-                        })
-                        .save(fileOutputPath)
-                })
+                        .on('start', commandLine => console.log(color('[FFmpeg]'), commandLine))
+                        .on('progress', progress => console.log(color('[FFmpeg]'), progress))
+                        .on('end', () => console.log(color('[FFmpeg]'), 'Processing finished!'))
+                        .stream(write)
+                }).then(buffer => {
+                    client.sendFile(from, baseURI(buffer, 'audio/mp3'), 'bass_boosted.mp3', '', id)
+                }).catch(_err)
+            } else if (cmd.text) {
+                let search = await ytsr(cmd.text)
+                let ss = await ssPage(search.link, 1000)
+                client.sendFile(from, ss, 'yt.png', `Menampilkan hasil untuk ${search.correctQuery ? `*${search.correctQuery}* atau telusuri _${search.query}_` : `*${search.query}*`}\n\n${search.items.map(config.msg.ytsearch).join('\n\n')}`, id)
             }
         })
 
         cmd.on('ss', /^ss(s|)$/i, async () => {
+            if (/\d/.test(cmd.args[0])) {
+                let page = await client.getPage()
+                let index = parseInt(cmd.args[0], 10)
+                await page.evaluate(new Function(`new Store.OpenChat().openChat(Store.Chat._models.filter(t=>!t.__x_isGroup)[${index}].__x_id._serialized)`))
+            }
             let ss = await client.getSnapshot()
             let pic = await client.sendImage(from, ss, 'screenshot.png', '', id, true)
             setTimeout(() => {
@@ -573,60 +564,50 @@ ${monospace(
         })
 
         cmd.on('fs', 'fs', async () => {
-            client.sendText(from, monospace(tree(__dirname, { exclude: [/node_modules/, /status/], depth: 5 }).replace(/── (.+)/g, (_, group) => `── ${/\..+/.test(group) ? '📄' : '📁'} ${group}`)))
+            client.sendText(from, monospace(tree(__dirname, {
+                exclude: [/node_modules/, /status/],
+                depth: 5
+            }).replace(/── (.+)/g, (_, group) => `── ${/\..+/.test(group) ? '📄' : '📁'} ${group}`)))
         })
 
         cmd.on('distord', ['distord', 'distorsi', 'earrape'], async () => {
             if (isQuotedAudio) {
-                client.reply(from, config.msg.waitConvert('mp3', 'wav', 'Biar mudah ngedit audionya ketika pake format itu'), id)
+                client.reply(from, config.msg.waitConvert('mp3', 'mp3', '⚠ WARNING ⚠\n🔇 Tau lah :v'), id)
                 const encryptMedia = isQuotedAudio ? quotedMsg : message
                 const _mimetype = isQuotedAudio ? quotedMsg.mimetype : mimetype
                 console.log(color('[WAPI]', 'green'), 'Downloading and decrypt media...')
                 const mediaData = await decryptMedia(encryptMedia)
-                Utils.decodeAudioData(mediaData, (err, audioBuffer) => {
-                    if (err) return client.sendText(from, config.msg.error('Ada yang error saat decoding file mp3\n\n' + e)) && _err(err)
-                    generated = audioBuffer._data.map(channel => {
-                        return channel.map(value => clampFloat(distordFX(value)))
-                    })
-
-                    buffer = wav.encode(generated, {
-                        sampleRate: audioBuffer.sampleRate,
-                        float: true,
-                        bitDepth: 32
-                    })
-
-                    let temp = './temp'
-                    let name = new Date() * 1
-                    let fileInputPath = path.join(temp, 'audio', `${name}.wav`)
-                    let fileOutputPath = path.join(temp, 'audio', `${name}.mp3`)
-                    console.log(color('[fs]', 'green'), `Writing media into '${fileInputPath}'`)
-                    client.reply(from, config.msg.waitConvert('wav', 'mp3', 'Nah... sekarang dikembaliin lagi formatnya'), id)
-                    fs.writeFile(fileInputPath, buffer, err => {
-                        if (err) return client.sendText(from, config.msg.error('Ada yang error saat menulis file\n\n' + err)) && _err(err)
-                        ffmpeg(fileInputPath)
-                            .format('mp3')
-                            .on('start', function (commandLine) {
-                                console.log(color('[FFmpeg]', 'green'), commandLine)
-                            })
-                            .on('progress', function (progress) {
-                                console.log(color('[FFmpeg]', 'green'), progress)
-                            })
-                            .on('end', function () {
-                                console.log(color('[FFmpeg]', 'green'), 'Processing finished!')
-                                // fs.readFile(fileOutputPath, { encoding: 'base64' }, (err, base64) => {
-                                // if (err) return client.sendText(from, 'Ada yang error saat membaca file .mp3') && console.log(color('[ERROR]', 'red'), err)
-                                client.sendFile(from, fileOutputPath, 'distorted.mp3', '', id)
-                                // })
-                                setTimeout(() => {
-                                    try {
-                                        fs.unlinkSync(fileInputPath)
-                                        fs.unlinkSync(fileOutputPath)
-                                    } catch (e) { _err(e) }
-                                }, 30000)
-                            })
-                            .save(fileOutputPath)
-                    })
-                })
+                stream2Buffer(write => {
+                    ffmpeg(buffer2Stream(mediaData))
+                        .audioFilter('aeval=sgn(val(ch))')
+                        .format('mp3')
+                        .on('start', commandLine => console.log(color('[FFmpeg]'), commandLine))
+                        .on('progress', progress => console.log(color('[FFmpeg]'), progress))
+                        .on('end', () => console.log(color('[FFmpeg]'), 'Processing finished!'))
+                        .stream(write)
+                }).then(buffer => {
+                    client.sendFile(from, baseURI(buffer, 'audio/mp3'), 'distorted.mp3', '', id)
+                }).catch(_err)
+            } else if (isQuotedVideo) {
+                // Bantuin ffmpeg nya :')
+                // biar bisa video filter sama audio filter
+                // client.reply(from, config.msg.waitConvert('mp4', 'mp4', '⚠ WARNING ⚠\n🔇 Tau lah :v'), id)
+                // const encryptMedia = isQuotedVideo ? quotedMsg : message
+                // const _mimetype = isQuotedVideo ? quotedMsg.mimetype : mimetype
+                // console.log(color('[WAPI]', 'green'), 'Downloading and decrypt media...')
+                // const mediaData = await decryptMedia(encryptMedia)
+                // stream2Buffer(write => {
+                //     ffmpeg(buffer2Stream(mediaData))
+                //         .complexFilter('scale=iw/2:ih/2,eq=saturation=100:contrast=10:brightness=0.3:gamma=10,noise=alls=100:allf=t,unsharp=5:5:1.25:5:5:1,eq=gamma_r=100:gamma=50,scale=iw/5:ih/5,scale=iw*4:ih*4,eq=brightness=-.1,unsharp=5:5:1.25:5:5:1')
+                //         .audioFilter('aeval=sgn(val(ch))')
+                //         .format('mp4')
+                //         .on('start', commandLine => console.log(color('[FFmpeg]'), commandLine))
+                //         .on('progress', progress => console.log(color('[FFmpeg]'), progress))
+                //         .on('end', () => console.log(color('[FFmpeg]'), 'Processing finished!'))
+                //         .stream(write)
+                // }).then(buffer => {
+                //     client.sendFile(from, baseURI(buffer, _mimetype), 'distorted.mp4', '', id)
+                // }).catch(_err)
             }
         })
 
@@ -693,39 +674,19 @@ ${monospace(
                 let freq = 60
                 if (cmd.args[0]) dB = clamp(parseInt(cmd.args[0]) || 20, 0, 50)
                 if (cmd.args[1]) freq = clamp(parseInt(cmd.args[1]) || 20, 20, 500)
+                console.log(color('[WAPI]', 'green'), 'Downloading and decrypt media...')
                 let mediaData = await decryptMedia(quotedMsg)
-                let temp = './temp'
-                let name = new Date() * 1
-                let fileInputPath = path.join(temp, 'audio', `${name}.mp3`)
-                let fileOutputPath = path.join(temp, 'audio', `${name}_2.mp3`)
-                console.log(color('[fs]', 'green'), `Writing media into '${fileInputPath}'`)
-                client.reply(from, config.msg.waitConvert('mp3', 'mp3', `Bass ${freq}hz: +${dB}dB`), id)
-                fs.writeFile(fileInputPath, mediaData, err => {
-                    if (err) return client.sendText(from, config.msg.error('Ada yang error saat menulis file\n\n' + err)) && _err(err)
-                    ffmpeg(fileInputPath)
+                stream2Buffer(write => {
+                    ffmpeg(buffer2Stream(mediaData))
                         .audioFilter('equalizer=f=' + freq + ':width_type=o:width=2:g=' + dB)
                         .format('mp3')
-                        .on('start', function (commandLine) {
-                            console.log(color('[FFmpeg]', 'green'), commandLine)
-                        })
-                        .on('progress', function (progress) {
-                            console.log(color('[FFmpeg]', 'green'), progress)
-                        })
-                        .on('end', function () {
-                            console.log(color('[FFmpeg]', 'green'), 'Processing finished!')
-                            // fs.readFile(fileOutputPath, { encoding: 'base64' }, (err, base64) => {
-                            // if (err) return client.sendText(from, 'Ada yang error saat membaca file .mp3') && console.log(color('[ERROR]', 'red'), err)
-                            client.sendFile(from, fileOutputPath, 'distorted.mp3', '', id)
-                            // })
-                            setTimeout(() => {
-                                try {
-                                    fs.unlinkSync(fileInputPath)
-                                    fs.unlinkSync(fileOutputPath)
-                                } catch (e) { _err(e) }
-                            }, 30000)
-                        })
-                        .save(fileOutputPath)
-                })
+                        .on('start', commandLine => console.log(color('[FFmpeg]'), commandLine))
+                        .on('progress', progress => console.log(color('[FFmpeg]'), progress))
+                        .on('end', () => console.log(color('[FFmpeg]'), 'Processing finished!'))
+                        .stream(write)
+                }).then(buffer => {
+                    client.sendFile(from, baseURI(buffer, 'audio/mp3'), 'bass_boosted.mp3', '', id)
+                }).catch(_err)
             }
         })
 
@@ -785,18 +746,19 @@ ${monospace(
                 [!isOperator, config.msg.notAllowed]
             ])
             if (failed[0]) return client.reply(from, failed[1], id)
-            client.reply(from, 'Mengirim broadcast...', id)
-            for (let chatId in group.data) {
-                if (group.data[chatId].broadcast) await client.sendTextWithMentions(chatId, config.msg.broadcast(sender, cmd.text))
-            }
+            if (Object.keys(group.data).filter(chatId => group.data[chatId].broadcast).length > 0) client.reply(from, 'Mengirim broadcast...', id)
+            else client.reply(from, 'Tidak ada penerima', id)
+            broadcast(client, sender, cmd.text)
         })
 
         cmd.on('allowbroadcast', 'allowbroadcast', async () => {
-            failed = permission([
-                [!isGroupMsg, config.msg.notGroup],
-                [!isGroupAdmins, config.msg.notAdmin]
-            ])
-            if (failed[0]) return client.reply(from, failed[1], id)
+            if (!isOperator) {
+                failed = permission([
+                    [!isGroupMsg, config.msg.notGroup],
+                    [!isGroupAdmins, config.msg.notAdmin]
+                ])
+                if (failed[0]) return client.reply(from, failed[1], id)
+            }
             bool = /^(y|ya|yes|enable|activate|true|1)$/i.test(cmd.args[0])
             group.setAllowBroadcast(groupId, bool)
             client.reply(from, `Allow receive broadcast from bot to this group is now set to *${bool ? 'en' : 'dis'}abled*`, id)
@@ -820,12 +782,24 @@ ${monospace(
             client.reply(from, `List:\n${Object.keys(cmd._events).join('\n')}`)
         })
 
+        cmd.on('ytsr', /^(yt|youtube)(search|sr)$/, async () => {
+            let search = await ytsr(cmd.text)
+            let ss = await ssPage(search.link, 1000)
+            client.sendFile(from, ss, 'yt.png', `Menampilkan hasil untuk ${search.correctQuery ? `*${search.correctQuery}* atau telusuri _${search.query}_` : `*${search.query}*`}\n\n${search.items.map(config.msg.ytsearch).join('\n\n')}`, id)
+        })
+
         cmd.check(body, true).then(data => {
             let tipe = bgColor(color(type.replace(/^./, (str) => str.toUpperCase()) + (from.startsWith('status') ? ' Status' : ''), 'black'), 'yellow')
-            if (data.pass) {
-                if (!isGroupMsg && sender && sender.isMe) console.log(color('[EXEC]'), color(moment(t * 1000).format('DD/MM/YY HH:mm:ss'), 'yellow'), color(`${cmd.command} [${cmd.args.length}]`), 'from', color(pushname), 'in', color(name || formattedTitle))
-                else if (!isGroupMsg) console.log(color('[EXEC]'), color(moment(t * 1000).format('DD/MM/YY HH:mm:ss'), 'yellow'), color(`${cmd.command} [${cmd.args.length}]`), 'from', color(pushname))
-                else if (isGroupMsg) console.log(color('[EXEC]'), color(moment(t * 1000).format('DD/MM/YY HH:mm:ss'), 'yellow'), color(`${cmd.command} [${cmd.args.length}]`), 'from', color(pushname), 'in', color(name || formattedTitle))
+            if (data.known) {
+                if (data.pass) {
+                    if (!isGroupMsg && sender && sender.isMe) console.log(color('[EXEC]'), color(moment(t * 1000).format('DD/MM/YY HH:mm:ss'), 'yellow'), color(`${cmd.command} [${cmd.args.length}]`), 'from', color(pushname), 'in', color(name || formattedTitle))
+                    else if (!isGroupMsg) console.log(color('[EXEC]'), color(moment(t * 1000).format('DD/MM/YY HH:mm:ss'), 'yellow'), color(`${cmd.command} [${cmd.args.length}]`), 'from', color(pushname))
+                    else if (isGroupMsg) console.log(color('[EXEC]'), color(moment(t * 1000).format('DD/MM/YY HH:mm:ss'), 'yellow'), color(`${cmd.command} [${cmd.args.length}]`), 'from', color(pushname), 'in', color(name || formattedTitle))
+                } else {
+                    if (!isGroupMsg && sender && sender.isMe) console.log(color('[????]'), color(moment(t * 1000).format('DD/MM/YY HH:mm:ss'), 'yellow'), color(`${cmd.command} [${cmd.args.length}]`, 'red'), 'from', color(pushname), 'in', color(name || formattedTitle))
+                    else if (!isGroupMsg) console.log(color('[????]'), color(moment(t * 1000).format('DD/MM/YY HH:mm:ss'), 'yellow'), color(`${cmd.command} [${cmd.args.length}]`, 'red'), 'from', color(pushname))
+                    else if (isGroupMsg) console.log(color('[????]'), color(moment(t * 1000).format('DD/MM/YY HH:mm:ss'), 'yellow'), color(`${cmd.command} [${cmd.args.length}]`, 'red'), 'from', color(pushname), 'in', color(name || formattedTitle))
+                }
             } else {
                 if (!isGroupMsg && sender && sender.isMe && message.ack > 0) console.log('[RECV]', color(moment(t * 1000).format('DD/MM/YY HH:mm:ss'), 'yellow'), `${tipe} from`, color(pushname)), 'in', color(name || formattedTitle)
                 else if (!isGroupMsg) console.log('[RECV]', color(moment(t * 1000).format('DD/MM/YY HH:mm:ss'), 'yellow'), `${tipe} from`, color(pushname))
@@ -833,9 +807,11 @@ ${monospace(
             }
         }).catch(e => {
             _err(e)
-            if (cmd.usedPrefix) client.sendText(message.from, config.msg.error(util.format(e)))
+            if (e.usedPrefix) client.sendText(message.from, config.msg.error(util.format(e)))
         })
-    } catch (e) { _err(e) }
+    } catch (e) {
+        _err(e)
+    }
 }
 
 function _err(e) {
@@ -884,7 +860,8 @@ function _err(e) {
 })()
 
 function permission(rules) {
-    for (let rule of rules) if (rule[0]) return rule
+    for (let rule of rules)
+        if (rule[0]) return rule
     return [false, '']
 }
 
@@ -907,84 +884,79 @@ function showHelp(prefix, name = '', command) {
         ytmp4: `Download YouTube Mp4: *${prefix}ytmp4 https://youtu.be/VQMCJgWxUoE*`,
         ytmp3: `Download YouTube Mp3: *${prefix}ytmp3 https://youtu.be/VQMCJgWxUoE*`,
         ig: `Download postingan Instagram: *${prefix}ig https://www.instagram.com/p/CFs8MvLg0s_/?igshid=1982zv2awlaqj*`,
-        nulis: `Nulis teks: *${prefix}nulis teks*`,
+        nulis: `Nulis teks: *${prefix}nulis tulisan*`,
     })[command] || 'Tidak ditemukan [404 Not Found]' : ''
     return `
-╔═ *${config.botName}*
-║ 👋 Hai, ${name}!
-╠═════════════════════
-║ *${prefix}help* command${command ? `\n║\n║ *Info Fitur*:\n║ ${reference}` : ''}${readMore}
-╟─── *Menu Admin* ────
-║
-║ ➕ *${prefix}add* 62XXXXXXXXXX1, 62XXXXXXXXXX2
-║ ➖ *${prefix}kick* @user
-║ 🔼 *${prefix}promote* @user
-║ 🔽 *${prefix}demote* @user
-║
-╟──── *Main Menu* ────
-║
-║ 🖼 *${prefix}stiker*
-║ 📽 *${prefix}gifstiker*
-║ #️⃣ *${prefix}meme* atas|bawah
-║ #️⃣ *${prefix}memestiker* atas|bawah
-║ ➡ *${prefix}resend*
-║ 🎵 *${prefix}mp3*
-║ 🔊 *${prefix}bass* desibel freqkuensi
-║ ℹ *${prefix}botstat*
-║ 😂 *${prefix}distord*
-║ 🌐 *${prefix}ssweb* url
-║ 🌐 *${prefix}sswebf* url
-║ 🔎 *${prefix}google* pencarian
-║ 🔎 *${prefix}googlef* pencarian
-║ 📄 *${prefix}nulis* teks
-║ 📄 *${prefix}ttstiker* teks
-║
-╟──── *Downloader* ────
-║
-║ ❌ Maaf, fitur ini masih
-║ dalam tahap pengembangan
-║
-║ ✅ Fitur sudah dikembangkan
-║ Fitur berikut pakai API
-║
-║ ✔ Tanpa API
-║
-║ ✔ *${prefix}ytmp3* url
-║ ✔ *${prefix}ytmp4* url
-║ ✅ *${prefix}ig* url
-║ ❌ *${prefix}fb* url
-║ ❌ *${prefix}tiktok* url
-║
-╟──── *Butuh API* ────
-║
-║ • ${config.API.mhankbarbar.url} •
-║ Tidak ada...
-║
-╟──── *Advanced* ────
-║
-║ *${prefix}setBroadcast* enable|disable
-║ *${prefix}setUserRole* @user index
-║ *${prefix}getUserRole* @user
-║ *${prefix}setRole* index key value
-║ *${prefix}keyList*
-║ *${prefix}roleList*
-║
-╟──── *Operator Only* ────
-║
-║ *${prefix}broadcast* text
-║
-╟──── *Iklan* ────
-║
-${(config.iklan || []).map((iklan, i) => `║ ${i + 1}. ${iklan}`).join('\n') || '║ _Tidak ada iklan_'}
-║
-╟──── *Bot Author* ────
-║
-║ Nurutomo
-║ wa.me/6281515860089
-║ https://github.com/Nurutomo/
-║ Repo: https://github.com/Nurutomo/nbot-wa
-║
-╚═════════════════════
+• *${config.botName}* •
+👋 Hai, ${name}!
+
+• *Info Tanda di Argumen* •
+Tanda *<>* = itu harus diisi
+Tanda *[]*  = tidak harus diisi
+Tanda *...* = dan seterusnya
+Tanda *|* = atau
+Tanda *@user* = di mention atau disebut
+
+• Info Fitur •
+*${prefix}help* [command]${command ? `\n║\n║ *Info Fitur*:\n║ ${reference}` : ''}
+${readMore}
+• *Menu Admin* •
+➕ *${prefix}add* <62XXXXXXXXXX1> [<62XXXXXXXXXXX> ...]
+➖ *${prefix}kick* <62XXXXXXXXXX1> [<62XXXXXXXXXXX> ...]
+🔼 *${prefix}promote* <@user>
+🔽 *${prefix}demote* <@user>
+
+• *Menu Utama* •
+🖼 *${prefix}stiker*
+📽 *${prefix}gifstiker*
+#️⃣ *${prefix}meme* <[atas|]bawah>
+#️⃣ *${prefix}memestiker* <[atas|]bawah>
+➡ *${prefix}resend*
+🎵 *${prefix}mp3* [pencarian]
+🔊 *${prefix}bass* [<desibel> <freqkuensi>]
+ℹ *${prefix}botstat*
+😂 *${prefix}distord*
+🌐 *${prefix}ssweb* <url>
+🌐 *${prefix}sswebf* <url>
+🔎 *${prefix}google* <pencarian>
+🔎 *${prefix}googlef* <pencarian>
+📄 *${prefix}nulis* <teks>
+📄 *${prefix}ttstiker* <teks>
+🔎 *${prefix}ytsr* <pencarian>
+• *Downloader* •
+❌ Not Working
+✔ With API
+✅ No API
+
+✅ *${prefix}ytmp3* <url>
+✅ *${prefix}ytmp4* <url>
+✔ *${prefix}ig* <url>
+❌ *${prefix}fb* <url>
+❌ *${prefix}tiktok* <url>
+
+• *Butuh API* •
+- ${config.API.mhankbarbar.url}
+Cuma IG :|
+
+• *Advanced* •
+📢 *${prefix}allowBroadcast* <enable|disable>
+🔰 *${prefix}setUserRole* <@user> <index>
+🔰 *${prefix}getUserRole* <@user>
+🔰 *${prefix}setRole* <index> <key> <value>
+🗝 *${prefix}keyList*
+🔰 ${prefix}roleList*
+
+• *Operator Only* •
+📢 *${prefix}broadcast* <text>
+
+• *Iklan* •
+${(config.iklan || []).map((iklan, i) => `${i + 1}. ${iklan}`).join('\n') || '_Tidak ada iklan_'}
+
+• *Bot Author* •
+𝙉𝙪𝙧𝙪𝙩𝙤𝙢𝙤 (Nurutomo)
+https://github.com/Nurutomo/
+Repo: https://github.com/Nurutomo/nbot-wa
+${readMore}wa.me/6281515860089
 `.slice(1, -1)
 }
 
@@ -994,7 +966,12 @@ function processSticker(input) {
             .toFormat('webp')
             .resize(512, 512, {
                 fit: 'contain',
-                background: { r: 0, g: 0, b: 0, alpha: 0 }
+                background: {
+                    r: 0,
+                    g: 0,
+                    b: 0,
+                    alpha: 0
+                }
             })
             .toBuffer()
             .then(resolve)
@@ -1038,11 +1015,11 @@ function monospace(string) {
 }
 
 /**
-* create custom meme
-* @param  {String} imageUrl
-* @param  {String} topText
-* @param  {String} bottomText
-*/
+ * create custom meme
+ * @param  {String} imageUrl
+ * @param  {String} topText
+ * @param  {String} bottomText
+ */
 async function customText(imageUrl, top, bottom) {
     return new Promise((resolve, reject) => {
         let fix = str => str.trim().replace(/\s/g, '_').replace(/\?/g, '~q').replace(/\%/g, '~p').replace(/\#/g, '~h').replace(/\//g, '~s')
@@ -1058,12 +1035,16 @@ async function customText(imageUrl, top, bottom) {
 function uploadImages(buffData, type) {
     // eslint-disable-next-line no-async-promise-executor
     return new Promise(async (resolve, reject) => {
-        const { ext } = await fromBuffer(buffData)
+        const {
+            ext
+        } = await fromBuffer(buffData)
         let temp = './temp'
         let name = new Date() * 1
         let filePath = path.join(temp, 'image', `${name}.${ext}`)
         const _buffData = type ? await resizeImage(buffData, false) : buffData
-        fs.writeFile(filePath, _buffData, { encoding: 'base64' }, (err) => {
+        fs.writeFile(filePath, _buffData, {
+            encoding: 'base64'
+        }, (err) => {
             if (err) return reject(err)
             console.log('Uploading image to telegra.ph server...')
             const fileData = fs.readFileSync(filePath)
@@ -1087,12 +1068,21 @@ function uploadImages(buffData, type) {
 function resizeImage(buff, encode) {
     return new Promise(async (resolve, reject) => {
         console.log('Resizeing image...')
-        const { mime } = await fromBuffer(buff)
-        sharp(buff, { failOnError: false })
+        const {
+            mime
+        } = await fromBuffer(buff)
+        sharp(buff, {
+            failOnError: false
+        })
             .toFormat('png')
             .resize(512, 512, {
                 fit: 'contain',
-                background: { r: 0, g: 0, b: 0, alpha: 0 }
+                background: {
+                    r: 0,
+                    g: 0,
+                    b: 0,
+                    alpha: 0
+                }
             })
             .toBuffer()
             .then(resizedImageBuffer => {
@@ -1125,14 +1115,6 @@ const fetchBase64 = (url, mimetype) => {
                 reject(err)
             })
     })
-}
-
-function distordFX(value) {
-    return value > 0 ? 1 : value < 0 ? -1 : 0
-}
-
-function clampFloat(value) {
-    return value > 1 ? 1 : value < -1 ? -1 : value
 }
 
 async function ssPage(url = 'about:blank', delay = 0, isFull = false, isPDF = false) {
@@ -1222,8 +1204,9 @@ function clamp(value, min, max) {
 function nulis(font, text, pagesLimit = 38) {
     return new Promise(async (resolve, reject) => {
         try {
+            text = text.replace(/\r\n/g, '\n')
             let spliter = []
-            let size = 18
+            let size = 20
 
             if (!Array.isArray(text)) {
                 let tempkata = ''
@@ -1232,7 +1215,7 @@ function nulis(font, text, pagesLimit = 38) {
                     if (i != '\n' && font.getAdvanceWidth(tempkata + i, size) < 734) tempkata += i
                     else {
                         kata += tempkata + '\n'
-                        tempkata = ''
+                        tempkata = i
                     }
                 }
                 if (tempkata) kata += tempkata
@@ -1241,18 +1224,23 @@ function nulis(font, text, pagesLimit = 38) {
 
             let line = 200
             let lines = []
-            for (let i of spliter.slice(0, 25)) {
+            for (let i of spliter) {
                 lines.push(text2image.convert(font, i, 170, line, size))
                 line += 39.5
             }
             lines = await Promise.all(lines)
             sharp('./src/buku.jpg').composite(lines.map(a => {
-                return { input: a, gravity: 'northwest' }
+                return {
+                    input: a,
+                    gravity: 'northwest'
+                }
             })).toBuffer((err, buf) => {
                 if (err) reject(err)
                 resolve(buf)
             })
-        } catch (e) { reject(err) }
+        } catch (e) {
+            reject(err)
+        }
     })
 }
 
@@ -1290,7 +1278,10 @@ function ytv(url) {
                             let KB = parseFloat(filesize) * (1000 * /MB$/.test(filesize))
                             resolve({
                                 dl_link: /<a.+?href="(.+?)"/.exec(res.result)[1],
-                                thumb, title, filesizeF: filesize, filesize: KB
+                                thumb,
+                                title,
+                                filesizeF: filesize,
+                                filesize: KB
                             })
                         }).catch(reject)
                 }).catch(reject)
@@ -1331,7 +1322,10 @@ function yta(url) {
                             let KB = parseFloat(filesize) * (1000 * /MB$/.test(filesize))
                             resolve({
                                 dl_link: /<a.+?href="(.+?)"/.exec(res.result)[1],
-                                thumb, title, filesizeF: filesize, filesize: KB
+                                thumb,
+                                title,
+                                filesizeF: filesize,
+                                filesize: KB
                             })
                         }).catch(reject)
                 }).catch(reject)
@@ -1352,10 +1346,144 @@ function post(url, formdata) {
     })
 }
 
-function loadJPGImg(stream) {
-    return new Promise(resolve => PImage.decodeJPEGFromStream(stream).then(resolve))
+function broadcast(client = new Client(), sender, text) {
+    let promises = []
+    for (let chatId in group.data) {
+        if (group.isAllowBroadcast(chatId)) promises.push(client.sendTextWithMentions(chatId, config.msg.broadcast(sender, text)))
+    }
+    return Promise.all(promises)
 }
 
+function formattedName(client = new Client(), message) {
+    body.match(/@(\d*)/g).filter(x => x.length > 5).map(x => Store.Contact.get(x.replace("@", "") + "@c.us"))
+
+    message.pushname || message.verifiedName || message.formattedName
+}
+
+/**
+ * Writable Stream Callback
+ * @callback WritableStreamCallback
+ * @param {WritableStream} stream 
+ */
+
+/**
+ * Convert Writable Stream to Buffer
+ * @param {WritableStreamCallback} cb Callback with stream
+ * @returns {Promise<Buffer>}
+ */
+function stream2Buffer(cb = noop) {
+    return new Promise(resolve => {
+        let write = new Writable()
+        write.data = []
+        write.write = function (chunk) {
+            this.data.push(chunk)
+        }
+        write.on('finish', function () {
+            resolve(Buffer.concat(this.data))
+        })
+
+        cb(write)
+    })
+}
+
+/**
+ * Convert Buffer to Readable Stream
+ * @param {Buffer} buffer
+ * @returns {ReadableStream}
+ */
+function buffer2Stream(buffer) {
+    return new Readable({
+        read() {
+            this.push(buffer)
+            this.push(null)
+        }
+    })
+}
+
+function baseURI(buffer = Buffer.from([]), metatype = 'text/plain') {
+    return `data:${metatype};base64,${buffer.toString('base64')}`
+}
+
+async function ytsr(query) {
+    let link = /youtube\.com\/results\?search_query=/.test(query) ? query : ('https://youtube.com/results?search_query=' + encodeURIComponent(query))
+    let res = await fetch(link)
+    let html = await res.text()
+    let data = new Function('return ' + /var ytInitialData = (.+)/.exec(html)[1])()
+    let lists = data.contents.twoColumnSearchResultsRenderer.primaryContents.sectionListRenderer.contents[0].itemSectionRenderer.contents
+    let formatList = {
+        query,
+        link,
+        items: []
+    }
+    for (let list of lists) {
+        let type = {
+            videoRenderer: 'video',
+            shelfRenderer: 'playlist',
+            radioRenderer: 'live',
+            channelRenderer: 'channel',
+            showingResultsForRenderer: 'typo',
+            horizontalCardListRenderer: 'suggestionCard',
+        }[Object.keys(list)[0]] || ''
+        let content = list[Object.keys(list)[0]] || {}
+        if (content) {
+            switch (type) {
+                case 'typo':
+                    formatList.correctQuery = content.correctedQuery.runs[0].text
+                    break
+                case 'video':
+                    formatList.items.push({
+                        type,
+                        title: content.title.runs[0].text.replace('â€’', '‒'),
+                        views: content.viewCountText.simpleText,
+                        description: content.descriptionSnippet ? content.descriptionSnippet.runs[0].text.replace('Â ...', ' ...') : '',
+                        duration: content.lengthText ? [content.lengthText.simpleText, content.lengthText.accessibility.accessibilityData.label] : ['', ''],
+                        thumbnail: content.thumbnail.thumbnails,
+                        link: 'https://youtu.be/' + content.videoId,
+                        videoId: content.videoId,
+                        author: {
+                            name: content.ownerText.runs[0].text,
+                            link: content.ownerText.runs[0].navigationEndpoint.commandMetadata.webCommandMetadata.url,
+                            thumbnail: content.channelThumbnailWithLinkRenderer ? content.channelThumbnailWithLinkRenderer.thumbnail.thumbnails : [],
+                            verified: content.ownerBadges && /BADGE_STYLE_TYPE_VERIFIED/.test(content.ownerBadges[0].metadataBadgeRenderer.style) ? /BADGE_STYLE_TYPE_VERIFIED_ARTIST/.test(content.ownerBadges[0].metadataBadgeRenderer.style) ? 'artist' : true : false
+                        }
+                    })
+                    break
+                case 'channel':
+                    formatList.items.push({
+                        type,
+                        title: content.title ? content.title.simpleText.replace('â€’', '‒') : '',
+                        description: content.descriptionSnippet ? content.descriptionSnippet.runs[0].text.replace('Â ...', ' ...') : '',
+                        videoCount: content.videoCountText ? content.videoCountText.runs[0].text : '',
+                        thumbnail: content.thumbnail.thumbnails,
+                        subscriberCount: content.subscriberCountText ? content.subscriberCountText.simpleText.replace('Â ', ' ') : '',
+                        link: 'https://youtube.com' + content.navigationEndpoint.commandMetadata.webCommandMetadata.url,
+                        verified: content.ownerBadges && /BADGE_STYLE_TYPE_VERIFIED/.test(content.ownerBadges[0].metadataBadgeRenderer.style) ? /BADGE_STYLE_TYPE_VERIFIED_ARTIST/.test(content.ownerBadges[0].metadataBadgeRenderer.style) ? 'artist' : true : false
+                    })
+                    break
+                case 'playlist':
+                    formatList.items.push({
+                        type,
+                        title: content.title.simpleText.replace('â€’', '‒'),
+                    })
+                    break
+            }
+        }
+    }
+    return formatList
+}
+
+/**
+ * No Operation
+ */
 function noop() { }
 
-const readMore = ' ​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​'
+/**
+ * WhatsApp Readmore Text
+ */
+const readMore = '​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​'
+
+global.handlerUpdate = function (client = new Client(), last, now) {
+    if (now - last > 10000) broadcast(client, {
+        id: 'System (Owner)'
+    }, `'./handler.js' Updated on ${now}`)
+}

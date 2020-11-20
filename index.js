@@ -1,13 +1,18 @@
 const { create, Client } = require('@open-wa/wa-automate')
 const { nocache } = require('./src/uncache')
 require('./handler.js')
+let lastLoad = new Date()
 const headless = false
+global.handlerUpdate = () => { }
 
 function start(client = new Client()) {
-  nocache('../handler.js', (_, module) => {
+  nocache('./handler.js', (isOk, module) => {
+    if (!isOk) return console.log(`Failed to update '${module}'`, err)
     console.log(`'${module}' Updated on ${new Date()}`)
+    global.handlerUpdate(client, lastLoad, new Date())
+    lastLoad = new Date()
   })
-  
+
   client.onStateChanged((state) => {
     console.log('[Client State]', state)
     if (state === 'CONFLICT') client.forceRefocus()
@@ -20,6 +25,8 @@ function start(client = new Client()) {
   client.darkMode(true)
 
   // client.onAddedToGroup(({ groupMetadata: { id }, contact: { name } }) => {})
+
+  global.client = client
 }
 
 let options = {
