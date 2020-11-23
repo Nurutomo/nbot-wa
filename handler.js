@@ -4,7 +4,7 @@ var config = {
     operator: ['6281515860089'].map(id => id.replace(/[^\d]/g, '') + '@c.us'),
     prefix: process.env.prefix ? new RegExp('^' + process.env.prefix) : /^[°•π÷×¶∆£¢€¥®™✓_=|~!?@#$%^&.\/\\©^]/,
     downloadStatus: false, // Curi Status Orang :|
-    devMode: true,
+    devMode: false, // true,
     msg: {
         notAdmin: '🔰 Maaf anda bukan admin grup',
         notGroup: '👨‍👩‍👧‍👦 Fitur ini hanya bisa digunakan di grup',
