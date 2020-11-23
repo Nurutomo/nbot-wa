@@ -1,3 +1,8 @@
+const chalk = require('chalk')
+function color(text, color) {
+    return !color ? chalk.green(text) : color.startsWith('#') ? chalk.hex(color)(text) : chalk.keyword(color)(text)
+}
+
 class CMDEvent {
     constructor(prefix) {
         this._events = {}
@@ -7,11 +12,18 @@ class CMDEvent {
     }
 
     on(eventName, match = /./, callback = () => { }, noPrefix) {
-        this._events[eventName] = {
+        console.log(color('[CMD]'), `Re${this._events[eventName] ? ' - re' : ''}gister command ${color(eventName, 'green')}`)
+        if (!this._events[eventName]) this._events[eventName] = {
             match,
             callback,
             enabled: true,
             externalDisable: true,
+            noPrefix,
+        }
+        else this._events[eventName] = {
+            ...this._events[eventName],
+            match,
+            callback,
             noPrefix,
         }
     }
@@ -24,7 +36,7 @@ class CMDEvent {
     }
 
     check(string = '', lower = true, ...args) {
-        return new Promise((resolve, reject) => {
+        return new Promise(async (resolve, reject) => {
             let parsed = this._parseCmd(string)
             this.args = parsed.args
             let body = this.command = lower ? parsed.command.toLowerCase() : parsed.command
@@ -38,18 +50,18 @@ class CMDEvent {
                 if (test && enabled) {
                     try {
                         if (externalDisable) {
-                            this.middleware(() => {
-                                resolve({ pass: true, known: true, name: eventName, data: this._events[eventName] })
+                            this.middleware(async () => {
+                                await resolve({ pass: true, known: true, name: eventName, data: this._events[eventName] })
                                 try {
-                                    callback.apply(this, args)
-                                } catch (e) {   
-                                    e.usedPrefix = cmd.usedPrefix
+                                    callback.call(this, ...args)
+                                } catch (e) {
+                                    e.usedPrefix = this.usedPrefix
                                     reject(e)
                                 }
                             }, eventName, this._events[eventName])
                         } else {
-                            resolve({ pass: true, known: true, name: eventName, data: this._events[eventName] })
-                            callback.apply(this, args)
+                            await resolve({ pass: true, known: true, name: eventName, data: this._events[eventName] })
+                            callback.call(this, ...args)
                         }
                         return
                     } catch (e) {
@@ -73,7 +85,7 @@ class CMDEvent {
     }
 
     _parseCmd(string = '') {
-        let usedPrefix = this._prefix.exec(string)
+        let usedPrefix = '' + this._prefix.exec(string)
         let args = string.replace(this._prefix, '').split(' ')
         if (args[0] === '') args.shift()
         let command = args.shift() || ''
@@ -89,4 +101,3 @@ class CMDEvent {
 }
 
 module.exports = CMDEvent
-delete require.cache[require.resolve(__filename)]
