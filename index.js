@@ -5,9 +5,9 @@ let lastLoad = new Date()
 const headless = false
 global.handlerUpdate = () => { }
 
-function start(client = new Client()) {
+async function start(client = new Client()) {
   nocache('./handler.js', (isOk, module) => {
-    if (!isOk) return console.log(`Failed to update '${module}'`, err)
+    if (!isOk) return console.log(`Failed to update '${module}'`, isOk)
     console.log(`'${module}' Updated on ${new Date()}`)
     global.handlerUpdate(client, lastLoad, new Date())
     lastLoad = new Date()
@@ -24,7 +24,30 @@ function start(client = new Client()) {
 
   client.darkMode(true)
 
-  // client.onAddedToGroup(({ groupMetadata: { id }, contact: { name } }) => {})
+  // client.onAddedToGroup(({ groupMetadata: { id }, contact: { name } }) => {
+  //   console.log('', id, name)
+  // })
+
+  // HTML Canvas Init
+  global.page = await client.getPage()
+  global.page.evaluate(() => {
+    window.initCanvas = (width, height, callback) => {
+      let c = document.createElement('canvas')
+      let ctx = c.getContext('2d')
+      c.width = width
+      c.height = height
+      return { c, ctx }
+    }
+
+    window.loadImg = src => {
+      return new Promise((resolve, reject) => {
+        let img = new Image()
+        img.src = src
+        img.onload = () => resolve(img)
+        img.onerror = err => reject(err)
+      })
+    }
+  })
 
   global.client = client
 }

@@ -1,7 +1,7 @@
 // Config
 var config = {
     botName: '🔹 𝙉 O T 🔹',
-    operator: ['6281515860089'].map(id => id.replace(/[^\d]/g, '') + '@c.us'),
+    operator: ['6281515860089'],
     prefix: process.env.prefix ? new RegExp('^' + process.env.prefix) : /^[°•π÷×¶∆£¢€¥®™✓_=|~!?@#$%^&.\/\\©^]/,
     downloadStatus: false, // Curi Status Orang :|
     devMode: false, // true,
@@ -68,8 +68,8 @@ var config = {
         'API: https://repl.it/@Nurutomo/MhankBarBar-Api',
     ],
     stickerGIF: {
-        fps: 30, // Lumayan
-        quality: 1, // Buriq?
+        fps: 20, // Lumayan
+        quality: 50, // Buriq?
         target: '1M',
         duration: 15 // Detik (Durasi Maksimal)
     },
@@ -137,6 +137,11 @@ const AsyncFunction = Object.getPrototypeOf(async function () { }).constructor
 const ytIdRegex = /(?:http(?:s|):\/\/|)(?:(?:www\.|)youtube(?:\-nocookie|)\.com\/(?:watch\?.*(?:|\&)v=|embed\/|v\/)|youtu\.be\/)([-_0-9A-Za-z]{11})/
 const chromeText = bgColor(color(`[${color('Ch', '#1DA462') + color('ro', '#DD5144') + color('me', '#FFCD46')}]`, '#4C8BF5'), '#112')
 
+// Config After Modules
+config.font = {
+  ttp: text2image.loadFont('Futura Bold Italic font')
+}
+
 module.exports = async function (client = new Client(), message) {
     try {
         let { body, type, id, from, to, t, sender, isGroupMsg, chat, caption, isMedia, mimetype, quotedMsg, quotedMsgObj, mentionedJidList, author } = message
@@ -171,11 +176,11 @@ module.exports = async function (client = new Client(), message) {
         pushname = pushname || verifiedName || formattedName // verifiedName is the name of someone who uses a business account
         const botNumber = await client.getHostNumber() + '@c.us'
         const groupId = isGroupMsg ? chat.id : ''
-        const groupAdmins = isGroupMsg && groupId ? await client.getGroupAdmins(groupId) : ''
-        const groupMembers = isGroupMsg && groupId ? await client.getGroupMembersId(groupId) : ''
+        const groupAdmins = chat && chat.groupMetadata && chat.groupMetadata.participants ? chat.groupMetadata.participants.filter(user=>user.isAdmin||user.isSuperAdmin).map(user=>user.id) : []
+        const groupMembers = chat && chat.groupMetadata && chat.groupMetadata.participants ? chat.groupMetadata.participants.map(user=>user.id) : []
         const isGroupAdmins = groupAdmins.includes(sender ? sender.id : '') || false
         const isBotGroupAdmins = groupAdmins.includes(botNumber) || false
-        const isOperator = (sender ? config.operator.includes(sender.id) || sender.isMe : false) || false
+        const isOperator = (sender ? config.operator.map(id => id.replace(/[^\d]/g, '') + '@c.us').includes(sender.id) || sender.isMe : false) || false
         if (isGroupMsg) group.update(groupId, chat.groupMetadata)
 
         body = (type === 'chat' && cmd.prefix.test(body)) ?
@@ -183,28 +188,44 @@ module.exports = async function (client = new Client(), message) {
             (((type === 'image' || type === 'video') && caption) && cmd.prefix.test(caption)) ?
                 caption :
                 ''
-        const isImage = type === 'image'
-        const isVideo = type === 'video'
-        const isQuotedImage = quotedMsg && quotedMsg.type === 'image'
-        const isQuotedVideo = quotedMsg && quotedMsg.type === 'video'
-        const isQuotedAudio = quotedMsg && (quotedMsg.type === 'audio' || quotedMsg.type === 'ptt')
-        const isQuotedFile = quotedMsg && quotedMsg.type === 'document'
-        const isQuotedSticker = quotedMsg && quotedMsg.type === 'sticker'
+        const isImage = /^image/.test(mimetype)
+        const isVideo = /^video/.test(mimetype)
+        const isQuotedImage = quotedMsgObj && /^image/.test(quotedMsgObj.mimetype)
+        const isQuotedVideo = quotedMsgObj && /^video/.test(quotedMsgObj.mimetype)
+        const isQuotedAudio = quotedMsgObj && /^audio/.test(quotedMsgObj.mimetype)
+        const isQuotedFile = quotedMsgObj && quotedMsgObj.type === 'document'
+        const isQuotedSticker = quotedMsgObj && quotedMsgObj.type === 'sticker'
         let rawText = type === 'chat' ?
             message.body :
             (type === 'image' || type === 'video') && caption ?
                 message.caption : ''
-        if (rawText.startsWith('> ') /* && sender.id == ownerNumber*/) {
+        if ((rawText||'').startsWith('> ') /* && sender.id == ownerNumber*/) {
             console.log(sender.id, 'is trying to use the execute command')
             let type = Function
             if (/await/.test(rawText)) type = AsyncFunction
-            let func = new type('print', 'client', 'message', 'config', 'group', 'fetch', 'fs', 'cmd', 'require', 'ti', rawText.slice(2))
+            let func = new type('print', 'client', 'message', 'config', 'group', 'fetch', 'fs', 'cmd', 'require', 'ti', 'cmd2case', !/^return /.test(rawText.slice(2)) && rawText.slice(2).split('\n').length === 1 ? 'return ' + rawText.slice(2) : rawText.slice(2))
             let output
             try {
                 output = func((...args) => {
                     console.log(...args)
                     client.reply(from, util.format(...args), id)
-                }, client, message, config, group, fetch, fs, cmd, require, text2image)
+                }, client, message, config, group, fetch, fs, cmd, require, text2image, text => text.replace(/^(async function|function|async).+\(.+?\).+{/, `case 'command':`).replace(/this\.(text|url|args)/g, (_, text) => {
+                  switch (text) {
+                    case 'text': 
+                        return "args.join(' ')"
+                        break
+                    case 'args': 
+                        return "args"
+                        break
+                    case 'url': 
+                        return "args[0]"
+                        break
+                    case 'prefix': 
+                        return "prefix"
+                        break
+                    default: return _
+                  }
+                }).replace(/}$/, '    break'))
                 console.log(output)
                 client.reply(from, '*Console Output*\n\n' + util.format(output), id)
             } catch (e) {
@@ -259,7 +280,7 @@ module.exports = async function (client = new Client(), message) {
                     else if (isGroupMsg) console.log(color('[????]'), color(moment(t * 1000).format('DD/MM/YY HH:mm:ss'), 'yellow'), color(`${cmd.command} [${cmd.args.length}]`, 'red'), 'from', color(pushname), 'in', color(name || formattedTitle))
                 }
             } else {
-                if (!isGroupMsg && sender && sender.isMe && message.ack > 0) console.log('[RECV]', color(moment(t * 1000).format('DD/MM/YY HH:mm:ss'), 'yellow'), `${tipe} from`, color(pushname)), 'in', color(name || formattedTitle)
+                if (!isGroupMsg && sender && sender.isMe) console.log('[RECV]', color(moment(t * 1000).format('DD/MM/YY HH:mm:ss'), 'yellow'), `${tipe} from`, color(pushname)), 'in', color(name || formattedTitle)
                 else if (!isGroupMsg && message.ack < 0) console.log('[RECV]', color(moment(t * 1000).format('DD/MM/YY HH:mm:ss'), 'yellow'), `${tipe} from`, color(pushname))
                 else if (isGroupMsg && message.ack < 0) console.log('[RECV]', color(moment(t * 1000).format('DD/MM/YY HH:mm:ss'), 'yellow'), `${tipe} from`, color(pushname), 'in', color(name || formattedTitle))
             }
@@ -325,19 +346,28 @@ cmd.on('memesticker', /^(memesti(c|)ker|sti(c|)kermeme)$/i, async function (clie
     } else client.reply(from, config.msg.noMedia, id)
 })
 
-cmd.on('sgif', /^(sti(c|)kergif|gifsti(c|)ker|sgif)$/i, async function (client = new Client(), { from, id, isMedia, isQuotedVideo, isQuotedFile, quotedMsg, message }) {
+cmd.on('sgif', /^(sti(c|)kergif|gifsti(c|)ker|sgif)$/i, async function (client = new Client(), { from, id, isMedia, isQuotedVideo, isQuotedFile, quotedMsg, message, isOperator }) {
+    if (!isOperator) return client.reply(from, 'Dh lh rusak lagi :(', id)
     if ((isMedia || isQuotedVideo || isQuotedFile) && this.args.length === 0) {
         const encryptMedia = isQuotedVideo || isQuotedFile ? quotedMsg : message
-        const _mimetype = encryptMedia.mimetype
-        client.reply(from, config.msg.waitConvert(_mimetype.replace(/.+\//, ''), 'webp', 'Stiker itu pakai format *webp*'), id)
-        if (/image/.test(_mimetype)) client.reply(from, config.msg.recommend(this.usedPrefix, 'stiker'), id)
+        const mimetype = encryptMedia.mimetype
+        client.reply(from, config.msg.waitConvert(mimetype.replace(/.+\//, ''), 'webp', 'Stiker itu pakai format *webp*'), id)
+        if (/image/.test(mimetype)) client.reply(from, config.msg.recommend(this.usedPrefix, 'stiker'), id)
         console.log(color('[WAPI]'), 'Downloading and decrypting media...')
         const mediaData = await decryptMedia(encryptMedia)
-        if (_mimetype === 'image/webp') client.sendRawWebpAsSticker(from, baseURI(mediaData.toString('base64')), true)
+        if (mimetype === 'image/webp') client.sendRawWebpAsSticker(from, mediaData.toString('base64'), true)
+        const pathFormat = {
+            name: new Date() * 1,
+            ext: mimetype.replace(/.+\//, '.'),
+            dir: path.resolve(path.join('temp', mimetype.replace(/\/.+/, '')))
+        }
+        const tempPath = path.format(pathFormat)
+        fs.mkdirSync(pathFormat.dir, { recursive: true })
+        fs.writeFileSync(tempPath, mediaData)
         const sticker = await stream2Buffer(write => {
-            ffmpeg(buffer2Stream(mediaData))
+            ffmpeg(tempPath)
                 .inputOptions([
-                    '-t', config.stickerGIF.duration
+                    '-t', config.stickerGIF.duration || '5'
                 ])
                 .complexFilter([
                     (config.stickerGIF.fps >= 1 ? 'fps=' + config.stickerGIF.fps + ',' : '') + 'scale=512:512:flags=lanczos:force_original_aspect_ratio=decrease,format=rgba,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=#00000000,setsar=1'
@@ -345,9 +375,6 @@ cmd.on('sgif', /^(sti(c|)kergif|gifsti(c|)ker|sgif)$/i, async function (client =
                 .outputOptions([
                     '-qscale', config.stickerGIF.quality,
                     '-fs', config.stickerGIF.target || '1M',
-                    '-vcodec', 'libwebp',
-                    // '-lossless', '1',
-                    '-preset', 'default',
                     '-loop', '0',
                     '-an',
                     '-vsync', '0'
@@ -359,6 +386,7 @@ cmd.on('sgif', /^(sti(c|)kergif|gifsti(c|)ker|sgif)$/i, async function (client =
                 .stream(write)
         })
         client.sendRawWebpAsSticker(from, sticker.toString('base64'), true)
+        fs.unlinkSync(tempPath)
     }
 })
 
@@ -378,18 +406,18 @@ cmd.on('add', ['add', '+'], async function (client = new Client(), { from, id, i
     }
 })
 
-cmd.on('kick', ['kick', '-'], async function (client = new Client(), { from, id, isGroupMsg, isGroupAdmins, isBotGroupAdmins, botNumber, groupId }) {
+cmd.on('kick', ['kick', '-'], async function (client = new Client(), { from, id, isGroupMsg, isGroupAdmins, isBotGroupAdmins, botNumber, groupId, mentionedJidList }) {
     failed = permission([
         [!isGroupMsg, config.msg.notGroup],
         [!isGroupAdmins, config.msg.notAdmin],
         [!isBotGroupAdmins, config.msg.notBotAdmin],
-        [this.args.length === 0, config.msg.noArgs],
-        [this.args.includes(botNumber), config.msg.self],
+        [mentionedJidList.length === 0, config.msg.noArgs],
+        [mentionedJidList.includes(botNumber), config.msg.self],
     ])
     if (failed[0]) return client.reply(from, failed[1], id)
     await client.sendTextWithMentions(from, config.msg.remove + this.args.map(config.msg.listUser).join('\n'))
-    for (let i = 0; i < this.args.length; i++) {
-        client.removeParticipant(groupId, this.args[i] + '@c.us')
+    for (let i = 0; i < mentionedJidList.length; i++) {
+        client.removeParticipant(groupId, mentionedJidList[i] + '@c.us')
     }
 })
 
@@ -568,20 +596,14 @@ ${cpus.map((cpu, i) => `${i + 1}. ${cpu.model.trim()} (${cpu.speed} MHZ)\n${Obje
 `.trim())
 })
 
-cmd.on('nulis', /^(mager|)[nt]ulis$/i, async function (client = new Client(), { from, id }) {
-    let text = this.text || (quotedMsgObj ? quotedMsgObj.body : '')
+cmd.on('nulis', /^(mager|)[nt]ulis$/i, async function (client = new Client(), { from, id, quotedMsgObj }) {
+    let text = this.text || (quotedMsgObj && quotedMsgObj.type == 'chat' ? quotedMsgObj.body : '')
     failed = permission([
         [!text, config.msg.noArgs]
     ])
     if (failed[0]) return client.reply(from, failed[1], id)
-    let font = text2image.loadFont('./src/IndieFlower')
-    // client.reply(from, config.msg.waitConvert('jpeg', 'png', '...'), id)
-    let pages = await nulis(font, text, 1)
-    console.log(pages)
-    client.sendFile(from, 'data:image/jpg;base64,' + pages.toString('base64'), 'nulis.png', ':v', id)
-    // for (let i = 0; i < pages.length; i++) {
-    //     client.sendFile(from, 'data:image/jpg;base64,' + pages[i].toString('base64'), 'nulis.png', ':v', id)
-    // }
+    let page = await nulis(text||formatName(text), 1)
+    client.sendFile(from, page, 'nulis.png', ':v', id)
 })
 
 cmd.on('ig', /^ig(dl|)$/i, async function (client = new Client(), { from, id }) {
@@ -625,7 +647,7 @@ cmd.on('ss', /^ss(s|)$/i, async function (client = new Client(), { from, id }) {
     if (/\d/.test(this.args[0])) {
         let page = await client.getPage()
         let index = parseInt(this.args[0], 10)
-        await page.evaluate(index => new Store.OpenChat().openChat(Store.Chat._models.filter(t=>!t.__x_isGroup)[index].__x_id._serialized), index)
+        await page.evaluate(index => new Store.OpenChat().openChat(Store.Chat._models.filter(t => !t.__x_isGroup)[index].__x_id._serialized), index)
     }
     let ss = await client.getSnapshot()
     let pic = await client.sendImage(from, ss, 'screenshot.png', '', id, true)
@@ -758,7 +780,7 @@ cmd.on('style', /^style|gaya$/i, async function (client = new Client(), { from, 
     }
 })
 
-cmd.on('bass', /^(bass(boost|)|fullbass)$/i, async function (client = new Client(), { from, id, quotedMsg }) {
+cmd.on('bass', /^(bass(boost|)|fullbass)$/i, async function (client = new Client(), { from, id, quotedMsg, isQuotedAudio }) {
     if (isQuotedAudio) {
         let dB = 20
         let freq = 60
@@ -842,7 +864,7 @@ cmd.on('broadcast', ['broadcast', 'bc'], async function (client = new Client(), 
     broadcast(client, sender, this.text)
 })
 
-cmd.on('allowbroadcast', 'allowbroadcast', async function (client = new Client(), { from, id, isGroupMsg, isGroupAdmins, isOperator }) {
+cmd.on('allowbroadcast', /^allowb(roadcast|c)$/i, async function (client = new Client(), { from, id, isGroupMsg, isGroupAdmins, isOperator, groupId }) {
     if (!isOperator) {
         failed = permission([
             [!isGroupMsg, config.msg.notGroup],
@@ -855,14 +877,14 @@ cmd.on('allowbroadcast', 'allowbroadcast', async function (client = new Client()
     client.reply(from, `Allow receive broadcast from bot to this group is now set to *${bool ? 'en' : 'dis'}abled*`, id)
 })
 
-cmd.on('ttsticker', ['ttsticker', 'ttstiker', 't2s'], async function (client = new Client(), { from, id, quotedMsgObj }) {
+cmd.on('ttsticker', /^(t2s|tt?stic?ker|ttp)$/i, async function (client = new Client(), { from, id, quotedMsgObj }) {
     let text = this.text || (quotedMsgObj ? quotedMsgObj.body : '')
     failed = permission([
         [!text, config.msg.noArgs]
     ])
     if (failed[0]) return client.reply(from, failed[1], id)
-    let font = text2image.loadFont('Futura Bold Italic font')
-    let imgText = await text2image.convert(font, text.slice(0, 50), 0, 0, 512, {
+
+    let imgText = await text2image.convert(config.font.ttp, (text||formatName(text)).slice(0, 50), 0, 0, 512, {
         attr: 'fill="#fff"',
         align: 'center'
     })
@@ -874,9 +896,10 @@ cmd.on('keylist', 'keylist', async function (client = new Client(), { from, id }
     client.reply(from, `List:\n${Object.keys(this._events).join('\n')}`, id)
 })
 
-cmd.on('test', 'test', function (_, o) {
+cmd.on('test', 'test', function (client = new Client(), { from, id }) {
     // client.sendText('6281515860089@c.us', util.format(_, o))
-    console.log(this)
+    console.log(formatName(this.text))
+    // client.reply(from, formatName(this.text), id)
 })
 
 cmd.on('ytsr', /^((yt|youtube)(search|sr)|lagu|musik|nyanyi|sing|song|play)$/, async function (client = new Client(), { from, id }) {
@@ -963,7 +986,8 @@ cmd.on('freeup', ['freeup', 'cutcache', 'cutmsgcache'], async function (client =
     client.reply(from, `*Message Cache Cutted*\n_RAM Free Up_\n\nBefore: ${before} Messages\nAfter: ${after} Messages`, id)
 })
 
-cmd.on('title', ['title', 'settitle', 'judul', 'ubahjudul'], async function (client = new Client(), { from, id, isGroupMsg, isGroupAdmins, isBotGroupAdmins, groupId }) {
+cmd.on('title', ['title', 'settitle', 'judul', 'ubahjudul'], async function (client = new Client(), { from, id, isGroupMsg, isGroupAdmins, isBotGroupAdmins, groupId, chat }) {
+    this.text = this.text.slice(0, 25)
     failed = permission([
         [!isGroupMsg, config.msg.notGroup],
         [!isGroupAdmins, config.msg.notAdmin],
@@ -971,10 +995,13 @@ cmd.on('title', ['title', 'settitle', 'judul', 'ubahjudul'], async function (cli
         [!cmd.text, config.msg.noArgs],
     ])
     if (failed[0]) return client.reply(from, failed[1], id)
-    client.setGroupTitle(groupId, cmd.text)
+    let before = chat.groupMetadata.formattedTitle
+    let page = global.page ? global.page : await client.getPage()
+    await page.evaluate((chatId, subject) => Store.WapQuery.changeSubject(chatId, subject), groupId, cmd.text)
+    client.reply(from, `Done!\n\nAfter:\n${this.text}\nBefore:\n${before}`, id)
 })
 
-cmd.on('desc', /^((set|)desc(ription|)|(ubah|)deskripsi)/i, async function (client = new Client(), { from, id, isGroupMsg, isGroupAdmins, isBotGroupAdmins, groupId }) {
+cmd.on('desc', /^((set|)desc(ription|)|(ubah|)deskripsi)/i, async function (client = new Client(), { from, id, isGroupMsg, isGroupAdmins, isBotGroupAdmins, groupId, chat }) {
     failed = permission([
         [!isGroupMsg, config.msg.notGroup],
         [!isGroupAdmins, config.msg.notAdmin],
@@ -982,7 +1009,12 @@ cmd.on('desc', /^((set|)desc(ription|)|(ubah|)deskripsi)/i, async function (clie
         [!cmd.text, config.msg.noArgs],
     ])
     if (failed[0]) return client.reply(from, failed[1], id)
-    client.setGroupDescription(groupId, cmd.text)
+    let page = global.page ? global.page : await client.getPage()
+    let res = await page.evaluate((chatId, description) => {
+        let descId = window.Store.GroupMetadata.get(chatId).descId;
+        return window.Store.WapQuery.setGroupDescription(chatId, description, window.Store.genId(), descId);
+    }, groupId, this.text)
+    client.reply(from, `Done!\n\nAfter:\n${this.text}\nBefore:\n${chat.groupMetadata.desc}`, id)
 })
 
 cmd.on('lock', ['lock', 'kunci', 'tutup'], async function (client = new Client(), { from, id, isGroupMsg, isGroupAdmins, isBotGroupAdmins, groupId }) {
@@ -992,7 +1024,7 @@ cmd.on('lock', ['lock', 'kunci', 'tutup'], async function (client = new Client()
         [!isBotGroupAdmins, config.msg.notBotAdmin],
     ])
     if (failed[0]) return client.reply(from, failed[1], id)
-    client.setGroupEditToAdminsOnly(groupId, true)
+    client.setGroupToAdminsOnly(groupId, true)
 })
 
 cmd.on('unlock', ['unlock', 'buka'], async function (client = new Client(), { from, id, isGroupMsg, isGroupAdmins, isBotGroupAdmins, groupId }) {
@@ -1002,7 +1034,7 @@ cmd.on('unlock', ['unlock', 'buka'], async function (client = new Client(), { fr
         [!isBotGroupAdmins, config.msg.notBotAdmin],
     ])
     if (failed[0]) return client.reply(from, failed[1], id)
-    client.setGroupEditToAdminsOnly(groupId, false)
+    client.setGroupToAdminsOnly(groupId, false)
 })
 
 cmd.on('adminlist', ['adminlist', 'listadmin', 'admins'], async function (client = new Client(), { from, id, isGroupMsg, groupAdmins }) {
@@ -1012,6 +1044,52 @@ cmd.on('adminlist', ['adminlist', 'listadmin', 'admins'], async function (client
     if (failed[0]) return client.reply(from, failed[1], id)
     client.sendTextWithMentions(from, `List Admin:\n${groupAdmins.map(config.msg.listUser)}`)
 })
+
+cmd.on('igfollow', ['follow', 'igfollow', 'followig'], async function (client = new Client(), { from, id }) {
+    this.text = this.text.replace(/^@/, '').replace(/\W|\.|_/g, '')
+    failed = permission([
+        [!this.text, config.msg.noArgs],
+        [!process.env.IG_BOT_PATH, 'Feature not installed or path not found\nIG_BOT_PATH=./instagram-followers-bot\n\nUse:\n> git clone https://github.com/Nurutomo/instagram-followers-bot.git\n> cd instagram-followers-bot\n> pip install -r requirements.txt'],
+        [!process.env.IG_USERNAME, 'Instagram Username not set\nIG_USERNAME=Username'],
+        [!process.env.IG_PASSWORD, 'Instagram Password not set\NIG_PASSWORD=Password'],
+    ])
+    if (failed[0]) return client.reply(from, failed[1], id)
+    const {spawn} = require('child_process')
+    
+    const follow = spawn('python',
+        [path.join(process.env.IG_BOT_PATH, 'main.py'), '-u', process.env.IG_USERNAME, '-p', process.env.IG_PASSWORD, '-o', 'follow', '-t', this.url],
+        {cwd:process.env.IG_BOT_PATH, env: {...process.env, PYTHONPATH:process.env.IG_BOT_PATH}}
+    )
+    follow.stdout.on('data', chunk => {
+        client.reply(from, `${chunk}\nhttps://www.instagram.com/${process.env.IG_USERNAME}/following/`, id)
+    })
+})
+
+cmd.on('apakah', 'apakah', async function (client = new Client(), { from, id, message }) {
+    client.reply(from, `Q: ${message.body}\nA: ${['Ya', 'Tidak', 'Mungkin', 'Ulangi lagi'][Math.floor(Math.random()*4)]}`, id)
+})
+
+cmd.on('rate', 'rate', async function (client = new Client(), { from, id }) {
+    client.reply(from, `Aku nilai ${Math.round(Math.random()*100)}%`, id)
+})
+
+cmd.on('kapan', ['kapan', 'kapankah'], async function (client = new Client(), { from, id, message }) {
+    client.reply(from, `Q: ${message.body}\nA: ${Math.round(Math.random()*16)} ${['detik', 'menit', 'jam', 'hari', 'minggu', 'bulan', 'tahun', 'abad'][Math.floor(Math.random()*8)]} lagi...`, id)
+})
+
+// cmd.on('check', ['check', 'info'], async function (client = new Client(), { from, id, isMedia, quotedMsgObj, message }) {
+//     if (isMedia || quotedMsgObj.isMedia) {
+//         const encryptMedia = !isMedia && quotedMsgObj ? quotedMsgObj : message
+//         const mediaData = decryptMedia(encryptMedia)
+//         ffmpeg(buffer2Stream(mediaData))
+//             .ffprobe((err, json) => {
+//                 if (err) client.reply(from, err, id) && _err(err)
+//                 else client.reply(from, json, id)
+//             })
+//     } else {
+//         client.reply(from, config.msg.noMedia, id)
+//     }
+// })
 
 /*
 Template Command Baru
@@ -1131,6 +1209,13 @@ ${readMore}
 📄 *${prefix}nulis* <teks>
 📄 *${prefix}ttstiker* <teks>
 🔎 *${prefix}ytsr* <pencarian>
+🔺 *${prefix}follow* <namaIG>
+
+• *Kerang Ajaib:v* •
+*${prefix}apakah* <pertanyaan>
+*${prefix}kapan* <pertanyaan>
+*${prefix}rate*
+
 • *Downloader* •
 ❌ Not Working
 ✔ With API
@@ -1210,8 +1295,8 @@ function pickRandom(arr, count = 1) {
     return result
 }
 
-function mhankbarbar(apiName, query) {
-    return fetch(config.API.mhankbarbar.url + config.API.mhankbarbar[apiName] + query)
+function mhankbarbar(apiName, query, type = 'json') {
+    return fetch(config.API.mhankbarbar.url + config.API.mhankbarbar[apiName] + query).then(res=>res[type]())
 }
 
 /**
@@ -1406,90 +1491,42 @@ function clamp(value, min, max) {
 
 /**
  * Nulis teks
- * @param {Font} font 
- * @param {String} text 
- * @param {Number} pagesLimit 
- * @returns {Array<Promise>}
+ * @param {String} text
+ * @returns {String} base64 Image
  */
-function nulis(font, text, pagesLimit = 38) {
-    return new Promise(async function (resolve, reject) {
-        try {
-            text = text.replace(/\r\n/g, '\n')
-            let kata = ''
-            let size = 20
+async function nulis(text) {
+    return await global.page.evaluate(async function (dataURI, text) {
+      let img = await window.loadImg(dataURI)
+      let { c, ctx } = window.initCanvas(img.width, img.height)
 
-            if (!Array.isArray(text)) {
-                let tempkata = ''
-                for (let i of [...text]) {
-                    if (i != '\n' && font.getAdvanceWidth(tempkata + i, size) < 734) tempkata += i
-                    else {
-                        kata += tempkata + '\n'
-                        tempkata = i
-                    }
-                }
-                if (tempkata) kata += tempkata
-            } else kata = text.join('\n')
+      ctx.drawImage(img, 0, 0)
 
-            let fixText = kata.split('\n').slice(0, 25).join('\n')
-            let textImage = await text2image.convert(font, fixText, 170, 200, size, {
-                lineHeight: 19.5
-            })
-            sharp('./src/buku.jpg').composite([
-                {
-                    input: textImage,
-                    gravity: 'northwest'
-                }
-            ]).toBuffer((err, buf) => {
-                if (err) reject(err)
-                resolve(buf)
-            })
-        } catch (e) {
-            reject(e)
-        }
-    })
+      text = text.replace(/\r\n|\n\r|\n/g, '\n')
+
+      let kata = ''
+      ctx.font = `24px "Indie Flower"`
+
+      if (!Array.isArray(text)) {
+          let tempkata = ''
+          for (let i of [...text]) {
+              if (i != '\n' && ctx.measureText(tempkata + i).width < 734) tempkata += i
+              else {
+                  kata += tempkata + '\n'
+                  tempkata = ''
+              }
+          }
+          if (tempkata) kata += tempkata
+      } else kata = text.join('\n')
+
+      let fixText = kata.split('\n').slice(0, 25).join('\n')
+      let y = 222
+      for (let line of fixText.split('\n')) {
+        ctx.fillText(line, 170, y)
+        y += 39.5
+      }
+      return c.toDataURL()
+    }, baseURI(fs.readFileSync('./src/buku.jpg'), 'image/jpg'), text)
 }
-// function nulis(font, text, pagesLimit = 38) {
-//     return new Promise(async function (resolve, reject) {
-//         try {
-//             text = text.replace(/\r\n/g, '\n')
-//             let spliter = []
-//             let size = 20
-
-//             if (!Array.isArray(text)) {
-//                 let tempkata = ''
-//                 let kata = ''
-//                 for (let i of [...text]) {
-//                     if (i != '\n' && font.getAdvanceWidth(tempkata + i, size) < 734) tempkata += i
-//                     else {
-//                         kata += tempkata + '\n'
-//                         tempkata = i
-//                     }
-//                 }
-//                 if (tempkata) kata += tempkata
-//                 spliter = kata.split('\n')
-//             } else spliter = text
-
-//             let line = 200
-//             let lines = []
-//             for (let i of spliter) {
-//                 lines.push(text2image.convert(font, i, 170, line, size))
-//                 line += 19.5 // 39.5
-//             }
-//             lines = await Promise.all(lines)
-//             sharp('./src/buku.jpg').composite(lines.map(a => {
-//                 return {
-//                     input: a,
-//                     gravity: 'northwest'
-//                 }
-//             })).toBuffer((err, buf) => {
-//                 if (err) reject(err)
-//                 resolve(buf)
-//             })
-//         } catch (e) {
-//             reject(e)
-//         }
-//     })
-// }
 
 function ytv(url) {
     return new Promise((resolve, reject) => {
@@ -1601,10 +1638,11 @@ function broadcast(client = new Client(), sender, text) {
     return Promise.all(promises)
 }
 
-function formattedName(client = new Client(), message) {
-    body.match(/@(\d*)/g).filter(x => x.length > 5).map(x => Store.Contact.get(x.replace("@", "") + "@c.us"))
-
-    message.pushname || message.verifiedName || message.formattedName
+async function formatName(message) {
+    return await global.page.evaluate(message => {
+        let jid = message.match(/@(\d*)/g).filter(x => x.length > 5).map(x => Store.Contact.get(x.replace("@", "") + "@c.us"))
+        return message.replace(/@(\d*)/g, (_, number)=>_.length<4?_:jid.map(id=>id.id.user).includes(number)?'@'+jid.filter(id=>id.id.user == number)[0].__x_mentionName:_)
+    }, message)
 }
 
 /**
@@ -1655,7 +1693,7 @@ async function ytsr(query) {
     let link = /youtube\.com\/results\?search_query=/.test(query) ? query : ('https://youtube.com/results?search_query=' + encodeURIComponent(query))
     let res = await fetch(link)
     let html = await res.text()
-    let data = new Function('return ' + /var ytInitialData = (.+)/.exec(html)[1])()
+    let data = new Function('return ' + /var ytInitialData = (\{.+\})/.exec(html)[1])()
     let lists = data.contents.twoColumnSearchResultsRenderer.primaryContents.sectionListRenderer.contents[0].itemSectionRenderer.contents
     let formatList = {
         query,
@@ -1730,7 +1768,7 @@ function noop() { }
 const readMore = '​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​'
 
 global.handlerUpdate = function (client = new Client(), last, now) {
-    // if (now - last > 10000) broadcast(client, {
-    //     id: 'System (Owner)'
-    // }, `'./handler.js' Updated on ${now}`)
+    if (now - last > 10000) broadcast(client, {
+        id: 'System (Owner)'
+    }, `'./handler.js' Updated on ${now}`)
 }
