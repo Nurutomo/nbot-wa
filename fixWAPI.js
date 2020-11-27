@@ -6,7 +6,7 @@ const replace = `$&
                 { id: "genId", conditions: (module) => (module.default && typeof module.default === 'function' && module.default.toString().match(/crypto/)) ? module.default : null }
 `
 
-text = fs.readFileSync(dir)
+text = fs.readFileSync(dir).toString()
 text = text.replace(find, replace)
 
 if (find.test(text)) fs.writeFileSync(dir, text)
