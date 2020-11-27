@@ -1,5 +1,5 @@
 const fs = require('fs')
-let dir = './node_modules/@open-wa/wa-automate/dist/api/wapi.js'
+let dir = './node_modules/@open-wa/wa-automate/dist/lib/wapi.js'
 
 const find = /\{ id: "UploadUtils", conditions: \(module\) => (module\.default && module\.default\.encryptAndUpload) \? module\.default : null \}[^,]/
 const replace = `$&
